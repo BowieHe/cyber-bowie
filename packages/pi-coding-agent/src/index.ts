@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 
 import { resolve } from "node:path";
-import { MockProvider } from "@cyber-bowie/pi-ai";
+import { config as loadEnv } from "dotenv";
+import { OpenAiProvider } from "@cyber-bowie/pi-ai";
 import {
   AgentSession,
   createDefaultSystemPrompt,
   loadSoulFile
 } from "@cyber-bowie/pi-agent-core";
+import {
+  createCyberBowieSearchSkill,
+  createMcpSearchRuntime
+} from "@cyber-bowie/pi-skills-search";
 import { superpowerSkill } from "@cyber-bowie/pi-skills-superpower";
+
+loadEnv({
+  path: resolve(process.cwd(), ".env"),
+  override: true
+});
 
 interface CliOptions {
   goal?: string;
@@ -49,15 +59,47 @@ function parseArgs(argv: string[]): CliOptions {
   };
 }
 
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`缺少环境变量 ${name}，请先配置 .env`);
+  }
+
+  return value;
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
   const session = new AgentSession(
-    new MockProvider("pi-coding-agent-mock"),
+    new OpenAiProvider({
+      apiKey: getRequiredEnv("OPENAI_API_KEY"),
+      model: process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini",
+      baseUrl: process.env.OPENAI_BASE_URL?.trim() || undefined,
+      temperature: process.env.OPENAI_TEMPERATURE
+        ? Number(process.env.OPENAI_TEMPERATURE)
+        : 0.4
+    }),
     createDefaultSystemPrompt()
   );
 
   session.registerSkill(superpowerSkill);
+  if (process.env.MCP_SEARCH_URL?.trim()) {
+    session.registerSkill(
+      createCyberBowieSearchSkill(
+        createMcpSearchRuntime({
+          serverUrl: process.env.MCP_SEARCH_URL.trim(),
+          toolName: process.env.MCP_SEARCH_TOOL?.trim() || "bailian_web_search",
+          authToken: process.env.MCP_SEARCH_AUTH_TOKEN?.trim() || undefined,
+          authHeader: process.env.MCP_SEARCH_AUTH_HEADER?.trim() || undefined,
+          resultCount: process.env.MCP_SEARCH_RESULT_COUNT
+            ? Number(process.env.MCP_SEARCH_RESULT_COUNT)
+            : 10
+        })
+      )
+    );
+  }
   session.setSoul(await loadSoulFile(resolve(process.cwd(), "SOUL.md")));
 
   if (options.listSkills) {

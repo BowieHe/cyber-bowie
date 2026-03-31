@@ -11,7 +11,13 @@
       "path": "./packages/pi-skills-superpower"
     },
     {
-      "path": "./packages/pi-web-chat"
+      "path": "./packages/pi-skills-search"
+    },
+    {
+      "path": "./packages/pi-channel-clawbot"
+    },
+    {
+      "path": "./packages/pi-server"
     },
     {
       "path": "./packages/pi-coding-agent"

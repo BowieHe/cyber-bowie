@@ -1,18 +1,17 @@
 {
-  "name": "@cyber-bowie/pi-coding-agent",
+  "name": "@cyber-bowie/pi-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "pi-coding-agent": "dist/index.js"
-  },
   "dependencies": {
     "@cyber-bowie/pi-ai": "0.1.0",
     "@cyber-bowie/pi-agent-core": "0.1.0",
+    "@cyber-bowie/pi-channel-clawbot": "0.1.0",
     "@cyber-bowie/pi-skills-search": "0.1.0",
-    "@cyber-bowie/pi-skills-superpower": "0.1.0"
+    "@cyber-bowie/pi-skills-superpower": "0.1.0",
+    "dotenv": "^16.6.1"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

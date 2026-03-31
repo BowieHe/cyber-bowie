@@ -1,4 +1,8 @@
-import type { AiProvider, CompletionMessage } from "@cyber-bowie/pi-ai";
+import type {
+  AiProvider,
+  CompletionChunk,
+  CompletionMessage
+} from "@cyber-bowie/pi-ai";
 import { readFile } from "node:fs/promises";
 
 export interface AgentTask {
@@ -11,12 +15,15 @@ export interface SkillMetadata {
   name: string;
   description: string;
   triggers?: string[];
+  version?: string;
+  requiredTools?: string[];
 }
 
 export interface SkillResult {
   skillName: string;
   summary: string;
   details: string[];
+  data?: unknown;
 }
 
 export interface AgentSkill {
@@ -99,7 +106,7 @@ export class AgentSession {
 
     const response = await this.provider.complete({
       messages: this.transcript,
-      temperature: 0.2
+      temperature: 1
     });
 
     this.transcript.push({
@@ -114,6 +121,53 @@ export class AgentSession {
       soul: this.soulText,
       skillResults
     };
+  }
+
+  public async *runStream(task: AgentTask): AsyncIterable<{
+    chunk: CompletionChunk;
+    aggregateText: string;
+    skillResults: SkillResult[];
+    soul?: string;
+  }> {
+    if (!this.provider.streamComplete) {
+      const result = await this.run(task);
+      yield {
+        chunk: {
+          textDelta: result.raw
+        },
+        aggregateText: result.raw,
+        skillResults: result.skillResults,
+        soul: result.soul
+      };
+      return;
+    }
+
+    const skillResults = await this.runTriggeredSkills(task);
+    const prompt = this.buildPrompt(task, skillResults);
+    this.transcript.push({
+      role: "user",
+      content: prompt
+    });
+
+    let aggregateText = "";
+
+    for await (const chunk of this.provider.streamComplete({
+      messages: this.transcript,
+      temperature: 0.2
+    })) {
+      aggregateText += chunk.textDelta;
+      yield {
+        chunk,
+        aggregateText,
+        skillResults,
+        soul: this.soulText
+      };
+    }
+
+    this.transcript.push({
+      role: "assistant",
+      content: aggregateText
+    });
   }
 
   private async runTriggeredSkills(task: AgentTask): Promise<SkillResult[]> {

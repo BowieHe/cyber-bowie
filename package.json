@@ -11,9 +11,12 @@
     "check": "tsc -b tsconfig.json && npm run check:assets --workspaces --if-present",
     "dev": "node packages/pi-coding-agent/dist/index.js",
     "agent": "node packages/pi-coding-agent/dist/index.js",
-    "web": "node packages/pi-web-chat/dist/server.js"
+    "server": "node packages/pi-server/dist/index.js",
+    "web": "node packages/pi-server/dist/index.js"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.0",
+    "dotenv": "^16.6.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",

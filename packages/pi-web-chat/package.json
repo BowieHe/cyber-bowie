@@ -3,18 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/server.js",
-  "types": "dist/server.d.ts",
   "dependencies": {
-    "@cyber-bowie/pi-ai": "0.1.0",
-    "@cyber-bowie/pi-agent-core": "0.1.0",
-    "@cyber-bowie/pi-skills-superpower": "0.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build --config web/vite.config.ts",
-    "check": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "build": "vite build --config web/vite.config.ts",
+    "check": "tsc -p web/tsconfig.json --noEmit",
     "build:assets": "vite build --config web/vite.config.ts",
     "check:assets": "tsc -p web/tsconfig.json --noEmit"
   }

@@ -10,13 +10,7 @@
   ],
   "references": [
     {
-      "path": "../pi-ai"
-    },
-    {
       "path": "../pi-agent-core"
-    },
-    {
-      "path": "../pi-skills-superpower"
     }
   ]
 }

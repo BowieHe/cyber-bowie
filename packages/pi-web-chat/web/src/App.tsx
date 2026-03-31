@@ -15,6 +15,12 @@ interface ChatResponse {
   skills: string[];
 }
 
+interface StreamEvent {
+  type: "delta" | "skills" | "done";
+  textDelta?: string;
+  skills?: string[];
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -36,6 +42,7 @@ export function App() {
   const [soulPreview, setSoulPreview] = useState("载入中...");
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,6 +80,9 @@ export function App() {
   }
 
   async function submitMessage(message: string): Promise<void> {
+    const assistantMessageId = `assistant-${Date.now()}`;
+
+    setDraft("");
     setMessages((current) => [
       ...current,
       {
@@ -80,13 +90,24 @@ export function App() {
         role: "user",
         name: "你",
         content: message
+      },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        name: "Bowie",
+        content: ""
       }
     ]);
 
     setIsLoading(true);
+    setIsStreaming(true);
+    requestAnimationFrame(() => {
+      autoResize();
+      textareaRef.current?.focus();
+    });
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -94,34 +115,74 @@ export function App() {
         body: JSON.stringify({ message })
       });
 
-      const data = (await response.json()) as ChatResponse | { error?: string };
-
-      if (!response.ok || !("reply" in data)) {
-        throw new Error("error" in data && data.error ? data.error : "请求失败");
+      if (!response.ok || !response.body) {
+        const fallback = (await response.json().catch(() => null)) as
+          | ChatResponse
+          | { error?: string }
+          | null;
+        throw new Error(
+          fallback && "error" in fallback && fallback.error ? fallback.error : "请求失败"
+        );
       }
 
-      setMessages((current) => [
-        ...current,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          name: "Bowie",
-          content: data.reply
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
         }
-      ]);
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const eventText of events) {
+          const lines = eventText
+            .split("\n")
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trim());
+
+          for (const line of lines) {
+            if (!line) {
+              continue;
+            }
+
+            const event = JSON.parse(line) as StreamEvent;
+
+            if (event.type === "delta" && event.textDelta) {
+              setMessages((current) =>
+                current.map((item) =>
+                  item.id === assistantMessageId
+                    ? {
+                        ...item,
+                        content: item.content + event.textDelta
+                      }
+                    : item
+                )
+              );
+            }
+          }
+        }
+      }
     } catch (error: unknown) {
-      setMessages((current) => [
-        ...current,
-        {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          name: "系统",
-          content: `出了点问题：${error instanceof Error ? error.message : String(error)}`
-        }
-      ]);
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === assistantMessageId
+            ? {
+                ...item,
+                name: "系统",
+                content: `出了点问题：${error instanceof Error ? error.message : String(error)}`
+              }
+            : item
+        )
+      );
     } finally {
-      setDraft("");
       setIsLoading(false);
+      setIsStreaming(false);
       textareaRef.current?.focus();
     }
   }
@@ -213,7 +274,14 @@ export function App() {
               <div className="avatar">{message.role === "user" ? "你" : "B"}</div>
               <div className="bubble">
                 <p className="message-role">{message.name}</p>
-                <div className="message-content">{message.content}</div>
+                <div className="message-content">
+                  {message.content}
+                  {isStreaming && message.id === messages[messages.length - 1]?.id ? (
+                    <span className="stream-cursor" aria-hidden="true">
+                      ▍
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </article>
           ))}
@@ -236,10 +304,12 @@ export function App() {
               disabled={isLoading}
             />
             <button className="send-button" disabled={isLoading} type="submit">
-              {isLoading ? "思考中..." : "送出"}
+              {isLoading ? "生成中..." : "送出"}
             </button>
           </label>
-          <p className="composer-tip">Enter 送出，Shift + Enter 换行</p>
+          <p className="composer-tip">
+            {isLoading ? "正在流式生成回复..." : "Enter 送出，Shift + Enter 换行"}
+          </p>
         </form>
       </main>
     </div>

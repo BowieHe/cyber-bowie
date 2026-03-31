@@ -20,8 +20,17 @@
       "@cyber-bowie/pi-skills-superpower": [
         "packages/pi-skills-superpower/src/index.ts"
       ],
+      "@cyber-bowie/pi-skills-search": [
+        "packages/pi-skills-search/src/index.ts"
+      ],
+      "@cyber-bowie/pi-server": [
+        "packages/pi-server/src/index.ts"
+      ],
+      "@cyber-bowie/pi-channel-clawbot": [
+        "packages/pi-channel-clawbot/src/index.ts"
+      ],
       "@cyber-bowie/pi-web-chat": [
-        "packages/pi-web-chat/src/server.ts"
+        "packages/pi-web-chat/web/src/main.tsx"
       ]
     },
     "strict": true,
