@@ -75,6 +75,19 @@ Example ClawBot-style payload:
 - `Authorization: Bearer <token>`
 - `X-Clawbot-Token: <token>`
 
+快速测试：
+
+```bash
+curl -X POST http://127.0.0.1:3000/api/channel/clawbot \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLAWBOT_WEBHOOK_TOKEN" \
+  -d '{
+    "sessionId": "wechat-room-001",
+    "userId": "wx-user-123",
+    "text": "你是谁"
+  }'
+```
+
 ## OpenAI 配置
 
 项目通过 `.env` 读取模型配置，最少需要：

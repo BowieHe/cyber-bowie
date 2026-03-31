@@ -20,6 +20,16 @@ This package is the message normalization layer between channel payloads and the
 }
 ```
 
+Another nested payload shape that the parser already accepts:
+
+```json
+{
+  "conversation": { "id": "group-chat-42" },
+  "sender": { "openid": "wx-open-id-888" },
+  "message": { "content": "请介绍一下你自己" }
+}
+```
+
 ## Webhook auth
 
 If `CLAWBOT_WEBHOOK_TOKEN` is configured, include one of:
@@ -47,3 +57,11 @@ X-Clawbot-Token: <token>
 ## Notes
 
 The exact Tencent/ClawBot production callback format may differ. This adapter is intentionally tolerant so we can plug in the real payload shape later without rewriting the agent core.
+
+## Quick test
+
+```bash
+SERVER_URL=http://127.0.0.1:3000 \
+CLAWBOT_WEBHOOK_TOKEN=your_token \
+bash packages/pi-channel-clawbot/examples/curl-example.sh
+```
