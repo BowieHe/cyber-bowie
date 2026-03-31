@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.turbo/
+
+# Codex local files
+.codex
+codex
+codex/

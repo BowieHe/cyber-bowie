@@ -1,0 +1,17 @@
+{
+  "name": "cyber-bowie",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces",
+    "dev": "node packages/pi-coding-agent/dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

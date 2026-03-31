@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@cyber-bowie/pi-ai": [
+        "packages/pi-ai/src/index.ts"
+      ],
+      "@cyber-bowie/pi-agent-core": [
+        "packages/pi-agent-core/src/index.ts"
+      ],
+      "@cyber-bowie/pi-coding-agent": [
+        "packages/pi-coding-agent/src/index.ts"
+      ]
+    },
+    "strict": true,
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  }
+}
