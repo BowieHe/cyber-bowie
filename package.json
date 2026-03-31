@@ -7,11 +7,20 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "check": "npm run check --workspaces",
-    "dev": "node packages/pi-coding-agent/dist/index.js"
+    "build": "tsc -b tsconfig.json && npm run build:assets --workspaces --if-present",
+    "check": "tsc -b tsconfig.json && npm run check:assets --workspaces --if-present",
+    "dev": "node packages/pi-coding-agent/dist/index.js",
+    "agent": "node packages/pi-coding-agent/dist/index.js",
+    "web": "node packages/pi-web-chat/dist/server.js"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "@types/node": "^24.5.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.5"
   }
 }

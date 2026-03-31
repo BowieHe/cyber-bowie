@@ -1,17 +1,12 @@
 {
-  "name": "@cyber-bowie/pi-coding-agent",
+  "name": "@cyber-bowie/pi-skills-superpower",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "pi-coding-agent": "dist/index.js"
-  },
   "dependencies": {
-    "@cyber-bowie/pi-ai": "0.1.0",
-    "@cyber-bowie/pi-agent-core": "0.1.0",
-    "@cyber-bowie/pi-skills-superpower": "0.1.0"
+    "@cyber-bowie/pi-agent-core": "0.1.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -3,6 +3,9 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": [
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
       "@cyber-bowie/pi-ai": [
@@ -13,6 +16,12 @@
       ],
       "@cyber-bowie/pi-coding-agent": [
         "packages/pi-coding-agent/src/index.ts"
+      ],
+      "@cyber-bowie/pi-skills-superpower": [
+        "packages/pi-skills-superpower/src/index.ts"
+      ],
+      "@cyber-bowie/pi-web-chat": [
+        "packages/pi-web-chat/src/server.ts"
       ]
     },
     "strict": true,
