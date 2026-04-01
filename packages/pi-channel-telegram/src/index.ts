@@ -41,8 +41,9 @@ export interface TelegramPollingResponse {
 export interface StartTelegramPollingOptions {
   bots: TelegramBotPersonaConfig[];
   onMessage(
-    event: TelegramMessageContext
-  ): Promise<TelegramPollingResponse | string | null | undefined>;
+    event: TelegramMessageContext,
+    sendMessage: (text: string) => Promise<void>
+  ): Promise<TelegramPollingResponse | string | null | undefined | void>;
   pollTimeoutSeconds?: number;
   pollIntervalMs?: number;
   log?(level: "info" | "warn" | "error", message: string, meta?: unknown): void;
@@ -367,24 +368,30 @@ export function startTelegramPolling(
                   continue;
                 }
 
-                const response = await options.onMessage(event);
-                const normalized =
-                  typeof response === "string"
-                    ? {
-                        text: response
-                      }
-                    : response;
+                // 创建 sendMessage 函数
+                const sendMessage = async (text: string) => {
+                  await telegramRequest(bot.token, "sendMessage", {
+                    chat_id: message.chatId,
+                    text,
+                    reply_to_message_id: message.messageId,
+                    message_thread_id: message.threadId
+                  });
+                };
 
-                if (!normalized?.text?.trim()) {
-                  continue;
+                // 调用 onMessage，传入 sendMessage
+                const response = await options.onMessage(event, sendMessage);
+                
+                // 如果返回了内容（兼容旧模式），再发一次
+                if (response) {
+                  const normalized =
+                    typeof response === "string"
+                      ? { text: response }
+                      : response;
+
+                  if (normalized?.text?.trim()) {
+                    await sendMessage(normalized.text);
+                  }
                 }
-
-                await telegramRequest(bot.token, "sendMessage", {
-                  chat_id: message.chatId,
-                  text: normalized.text,
-                  reply_to_message_id: normalized.replyToMessageId,
-                  message_thread_id: message.threadId
-                });
               }
             } catch (error: unknown) {
               if (stopped) {

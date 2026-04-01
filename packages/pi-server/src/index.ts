@@ -84,16 +84,32 @@ async function main(): Promise<void> {
     telegramBots.length > 0
       ? startTelegramPolling({
           bots: telegramBots,
-          async onMessage(event) {
-            const result = await chatService.buildReply(event.message.text, {
-              personaId: event.bot.personaId,
-              sessionId: createTelegramSessionId(event.message)
-            });
-
-            return {
-              text: result.reply,
-              replyToMessageId: event.message.messageId
-            };
+          async onMessage(event, sendMessage) {
+            const message = event.message.text;
+            const sessionId = createTelegramSessionId(event.message);
+            
+            console.log(`[Telegram] Received message: ${message.substring(0, 50)}...`);
+            
+            // 使用 orchestrateReply，即时发送每条消息
+            for await (const item of chatService.orchestrateReply(message, {
+              sessionId
+            })) {
+              if (item.type === "announce") {
+                // Orchestrator 开场白
+                await sendMessage(`[呱吉] ${item.text}`);
+                console.log(`[Orchestrator] Sent announce`);
+              } else {
+                // Persona 回复
+                await sendMessage(`[${item.displayName}] ${item.text}`);
+                console.log(`[${item.personaId}] Sent reply`);
+              }
+              
+              // 稍微停顿，让对话更自然
+              await new Promise(r => setTimeout(r, 600));
+            }
+            
+            // 返回 void（表示已自行发送）
+            return undefined;
           },
           log(level, message, meta) {
             const line =
@@ -152,35 +168,8 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (request.method === "POST" && url.pathname === "/api/chat/stream") {
-        const body = await readJsonBody<ChatRequestBody>(request);
-        const message = body.message?.trim();
-        const sessionId = body.sessionId?.trim();
-        const personaId = body.personaId?.trim();
-
-        if (!message) {
-          const payload = jsonResponse({ error: "message 不能为空" }, 400);
-          response.writeHead(payload.statusCode, payload.headers);
-          response.end(payload.body);
-          return;
-        }
-
-        response.writeHead(200, {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive"
-        });
-
-        for await (const event of chatService.streamReply(message, {
-          sessionId: sessionId || undefined,
-          personaId: personaId || undefined
-        })) {
-          response.write(`data: ${JSON.stringify(event)}\n\n`);
-        }
-
-        response.end();
-        return;
-      }
+      // 删除 /api/chat/stream，因为 orchestrateReply 已经支持即时发送
+      // 如果需要 Web 流式，后续可以实现 WebSocket 版本
 
       if (request.method === "GET") {
         const payload = await serveStatic(url.pathname);

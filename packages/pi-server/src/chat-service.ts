@@ -4,7 +4,10 @@ import { OpenAiProvider, type AiProvider } from "@cyber-bowie/pi-ai";
 import {
   AgentSession,
   createDefaultSystemPrompt,
-  loadSoulFile
+  loadSoulFile,
+  Orchestrator,
+  type ExecutionPlan,
+  type ExecutionStep
 } from "@cyber-bowie/pi-agent-core";
 import {
   createCyberBowieSearchSkill,
@@ -23,14 +26,7 @@ export interface PersonaDefinition {
   soulPath: string;
   introduction?: string;
   specialties: string[];
-  collaborators: string[];
-  collaborationStyle?: string;
-  collaborationMode: "auto" | "always" | "manual";
-}
-
-interface SessionContext {
-  session: AgentSession;
-  updatedAt: number;
+  skills: string[];  // persona 掌握的 skills
 }
 
 interface PersonaConfigRecord {
@@ -38,9 +34,7 @@ interface PersonaConfigRecord {
   displayName?: string;
   introduction?: string;
   specialties?: string[];
-  collaborators?: string[];
-  collaborationStyle?: string;
-  collaborationMode?: "auto" | "always" | "manual";
+  skills?: string[];
 }
 
 interface PersonaTeamConfig {
@@ -54,11 +48,9 @@ export interface ChatRequestOptions {
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-
   if (!value) {
     throw new Error(`缺少环境变量 ${name}，请先配置 .env`);
   }
-
   return value;
 }
 
@@ -84,7 +76,6 @@ function parseSoulDisplayName(soulText: string, fallback: string): string {
   if (!line) {
     return fallback;
   }
-
   const name = line.split(":").slice(1).join(":").trim();
   return name || fallback;
 }
@@ -93,19 +84,11 @@ function normalizeKeywords(values: string[] | undefined): string[] {
   if (!values) {
     return [];
   }
-
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
-}
-
-function parseCollaborationMode(
-  value: unknown
-): "auto" | "always" | "manual" | undefined {
-  return value === "auto" || value === "always" || value === "manual" ? value : undefined;
 }
 
 async function readPersonaTeamConfig(cwd: string): Promise<PersonaTeamConfig | null> {
   const configPath = join(cwd, "personas.json");
-
   if (!(await fileExists(configPath))) {
     return null;
   }
@@ -139,16 +122,9 @@ async function readPersonaTeamConfig(cwd: string): Promise<PersonaTeamConfig | n
             specialties: Array.isArray(item.specialties)
               ? item.specialties.filter((value): value is string => typeof value === "string")
               : [],
-            collaborators: Array.isArray(item.collaborators)
-              ? item.collaborators
-                  .filter((value): value is string => typeof value === "string")
-                  .map((value) => value.trim().toLowerCase())
-              : [],
-            collaborationStyle:
-              typeof item.collaborationStyle === "string" && item.collaborationStyle.trim()
-                ? item.collaborationStyle.trim()
-                : undefined,
-            collaborationMode: parseCollaborationMode(item.collaborationMode)
+            skills: Array.isArray(item.skills)
+              ? item.skills.filter((value): value is string => typeof value === "string")
+              : []
           };
         })
         .filter((item) => item.id.length > 0)
@@ -159,7 +135,6 @@ async function readPersonaTeamConfig(cwd: string): Promise<PersonaTeamConfig | n
 }
 
 export class ChatService {
-  private readonly sessions = new Map<string, SessionContext>();
   private readonly providerFactory: () => AiProvider;
 
   public constructor(private readonly config: ChatServiceConfig) {
@@ -176,49 +151,15 @@ export class ChatService {
         }));
   }
 
-  private createAgentSession(): AgentSession {
-    const session = new AgentSession(
-      this.providerFactory(),
-      createDefaultSystemPrompt()
-    );
-
-    session.registerSkill(superpowerSkill);
-
-    if (process.env.MCP_SEARCH_URL?.trim()) {
-      session.registerSkill(
-        createCyberBowieSearchSkill(
-          createMcpSearchRuntime({
-            serverUrl: process.env.MCP_SEARCH_URL.trim(),
-            toolName: process.env.MCP_SEARCH_TOOL?.trim() || "bailian_web_search",
-            authToken: process.env.MCP_SEARCH_AUTH_TOKEN?.trim() || undefined,
-            authHeader: process.env.MCP_SEARCH_AUTH_HEADER?.trim() || undefined,
-            resultCount: process.env.MCP_SEARCH_RESULT_COUNT
-              ? Number(process.env.MCP_SEARCH_RESULT_COUNT)
-              : 10
-          })
-        )
-      );
-    }
-
-    return session;
-  }
-
-  private buildSessionKey(options: ChatRequestOptions): string {
-    return `${normalizePersonaId(options.personaId)}::${options.sessionId ?? "__ephemeral__"}`;
-  }
-
   private async resolvePersonaSoulPath(personaId?: string): Promise<string> {
     const normalizedPersonaId = normalizePersonaId(personaId);
-
     if (normalizedPersonaId === "default" || normalizedPersonaId === "bowie") {
       return join(this.config.cwd, "SOUL.md");
     }
-
     const fromSoulsDir = join(this.config.cwd, "souls", `${normalizedPersonaId}.md`);
     if (await fileExists(fromSoulsDir)) {
       return fromSoulsDir;
     }
-
     return join(this.config.cwd, "SOUL.md");
   }
 
@@ -228,21 +169,17 @@ export class ChatService {
 
   private async discoverSoulPersonas(): Promise<PersonaDefinition[]> {
     const soulsDir = join(this.config.cwd, "souls");
-
     if (!(await fileExists(soulsDir))) {
       return [];
     }
 
-    const entries = await readdir(soulsDir, {
-      withFileTypes: true
-    });
+    const entries = await readdir(soulsDir, { withFileTypes: true });
     const personas: PersonaDefinition[] = [];
 
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".md")) {
         continue;
       }
-
       const soulPath = join(soulsDir, entry.name);
       const id = basename(entry.name, ".md").trim().toLowerCase();
       const soul = await loadSoulFile(soulPath);
@@ -252,8 +189,7 @@ export class ChatService {
         displayName: parseSoulDisplayName(soul, id),
         soulPath,
         specialties: [],
-        collaborators: [],
-        collaborationMode: "auto"
+        skills: []
       });
     }
 
@@ -266,19 +202,21 @@ export class ChatService {
     const rootSoul = await loadSoulFile(rootSoulPath);
     const teamConfig = await readPersonaTeamConfig(this.config.cwd);
 
+    // 默认 persona
     personas.set("bowie", {
       id: "bowie",
       displayName: parseSoulDisplayName(rootSoul, "Bowie"),
       soulPath: rootSoulPath,
       specialties: [],
-      collaborators: [],
-      collaborationMode: "auto"
+      skills: ["orchestrate", "default_chat"]
     });
 
+    // 从 souls 目录发现的 persona
     for (const persona of await this.discoverSoulPersonas()) {
       personas.set(persona.id, persona);
     }
 
+    // 从 personas.json 合并配置
     for (const personaConfig of teamConfig?.personas ?? []) {
       const soulPath = await this.resolvePersonaSoulPath(personaConfig.id);
       const existing = personas.get(personaConfig.id);
@@ -289,367 +227,239 @@ export class ChatService {
         soulPath,
         introduction: personaConfig.introduction ?? existing?.introduction,
         specialties: normalizeKeywords(personaConfig.specialties ?? existing?.specialties),
-        collaborators: normalizeKeywords(personaConfig.collaborators ?? existing?.collaborators),
-        collaborationStyle: personaConfig.collaborationStyle ?? existing?.collaborationStyle,
-        collaborationMode: personaConfig.collaborationMode ?? existing?.collaborationMode ?? "auto"
-      });
-    }
-
-    const configured = process.env.TELEGRAM_BOTS_JSON?.trim();
-    if (!configured) {
-      return [...personas.values()];
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(configured);
-    } catch {
-      return [...personas.values()];
-    }
-
-    if (!Array.isArray(parsed)) {
-      return [...personas.values()];
-    }
-
-    for (const item of parsed) {
-      if (!item || typeof item !== "object") {
-        continue;
-      }
-
-      const record = item as Record<string, unknown>;
-      const personaId =
-        typeof record.personaId === "string" && record.personaId.trim()
-          ? normalizePersonaId(record.personaId)
-          : null;
-
-      if (!personaId) {
-        continue;
-      }
-
-      const soulPath = await this.resolvePersonaSoulPath(personaId);
-      const existing = personas.get(personaId);
-      personas.set(personaId, {
-        id: personaId,
-        displayName:
-          typeof record.displayName === "string" && record.displayName.trim()
-            ? record.displayName.trim()
-            : existing?.displayName ?? personaId,
-        soulPath,
-        introduction: existing?.introduction,
-        specialties: existing?.specialties ?? [],
-        collaborators: existing?.collaborators ?? [],
-        collaborationStyle: existing?.collaborationStyle,
-        collaborationMode: existing?.collaborationMode ?? "auto"
+        skills: normalizeKeywords(personaConfig.skills ?? existing?.skills)
       });
     }
 
     return [...personas.values()];
   }
 
-  private buildTeamRoster(personas: PersonaDefinition[]): string[] {
-    return personas.map((persona) => {
-      const parts = [
-        `${persona.displayName} (${persona.id})`,
-        persona.specialties.length > 0 ? `擅长: ${persona.specialties.join("、")}` : null,
-        persona.introduction ? `定位: ${persona.introduction}` : null
-      ].filter(Boolean);
-
-      return `- ${parts.join("；")}`;
-    });
-  }
-
-  private shouldCollaborate(message: string, persona: PersonaDefinition, personas: PersonaDefinition[]): boolean {
-    if (persona.collaborationMode === "manual") {
-      return /一起讨论|一起看|找.*一起|请.*协作|圆桌|顾问团/.test(message);
-    }
-
-    if (persona.collaborationMode === "always") {
-      return personas.length > 1;
-    }
-
-    if (personas.length <= 1) {
-      return false;
-    }
-
-    return (
-      message.length >= 16 ||
-      /分析|比较|方案|架构|研究|搜索|规划|评估|风险|设计|实现|拆分|怎么做|为什么/.test(
-        message
-      )
-    );
-  }
-
-  private pickCollaborators(activePersona: PersonaDefinition, personas: PersonaDefinition[]): PersonaDefinition[] {
-    const collaboratorIds =
-      activePersona.collaborators.length > 0
-        ? activePersona.collaborators
-        : personas
-            .filter((persona) => persona.id !== activePersona.id)
-            .map((persona) => persona.id);
-
-    const maxPeers = Math.max(1, Number(process.env.PERSONA_COLLAB_MAX_PEERS || 2));
-
-    return collaboratorIds
-      .map((id) => personas.find((persona) => persona.id === id))
-      .filter((persona): persona is PersonaDefinition => Boolean(persona))
-      .filter((persona) => persona.id !== activePersona.id)
-      .slice(0, maxPeers);
-  }
-
-  private async collectCollaboratorNotes(
-    message: string,
-    options: ChatRequestOptions,
-    activePersona: PersonaDefinition,
-    personas: PersonaDefinition[]
-  ): Promise<Array<{ persona: PersonaDefinition; note: string }>> {
-    const collaborators = this.pickCollaborators(activePersona, personas);
-
-    if (collaborators.length === 0) {
-      return [];
-    }
-
-    const teamRoster = this.buildTeamRoster(personas);
-    const notes = await Promise.all(
-      collaborators.map(async (persona) => {
-        const session = await this.getOrCreateSession({
-          sessionId: options.sessionId,
-          personaId: persona.id
-        });
-        const result = await session.run({
-          goal: `请从你的擅长方向，协助 ${activePersona.displayName} 回答这个问题：${message}`,
-          constraints: [
-            "所有输出都使用中文",
-            "这是一份只给队友看的内部意见，不要写客套话",
-            "控制在 80 到 180 字之间",
-            "优先给出你的专业判断、关键风险、建议动作"
-          ],
-          context: [
-            "你正在一个多人格团队里协作",
-            `当前主答 persona: ${activePersona.displayName} (${activePersona.id})`,
-            `你的 persona: ${persona.displayName} (${persona.id})`,
-            persona.collaborationStyle
-              ? `你的协作风格: ${persona.collaborationStyle}`
-              : "你的任务是给出高密度、可执行的内部意见",
-            "团队成员如下：",
-            ...teamRoster
-          ]
-        });
-
-        return {
-          persona,
-          note: result.raw.trim()
-        };
-      })
+  /**
+   * 为指定 persona 创建 session，并注册该 persona 的 skills
+   */
+  private async createPersonaSession(personaId: string): Promise<AgentSession> {
+    const session = new AgentSession(
+      this.providerFactory(),
+      createDefaultSystemPrompt()
     );
 
-    return notes.filter((item) => item.note.length > 0);
-  }
-
-  private async buildRunInput(
-    message: string,
-    options: ChatRequestOptions
-  ): Promise<{
-    personaId: string;
-    personas: PersonaDefinition[];
-    activePersona: PersonaDefinition;
-    constraints: string[];
-    context: string[];
-    collaborationNotes: Array<{ persona: PersonaDefinition; note: string }>;
-  }> {
-    const personaId = normalizePersonaId(options.personaId);
+    // 获取 persona 的 skills
     const personas = await this.listPersonas();
-    const activePersona =
-      personas.find((persona) => persona.id === personaId) ??
-      personas[0] ?? {
-        id: personaId,
-        displayName: personaId,
-        soulPath: join(this.config.cwd, "SOUL.md"),
-        specialties: [],
-        collaborators: [],
-        collaborationMode: "auto"
-      };
-    const teamRoster = this.buildTeamRoster(personas);
-    const collaborationNotes = this.shouldCollaborate(message, activePersona, personas)
-      ? await this.collectCollaboratorNotes(message, options, activePersona, personas)
-      : [];
+    const persona = personas.find(p => p.id === normalizePersonaId(personaId));
+    const skills = persona?.skills ?? [];
 
-    return {
-      personaId,
-      personas,
-      activePersona,
-      collaborationNotes,
-      constraints: [
-        "所有输出都使用中文",
-        "优先给出小而可用的方案",
-        "保持语气自然，像真实的人在解释"
-      ],
-      context: [
-        "这是一个人格化 agent server",
-        "需要保留 SOUL 定义的人格",
-        "如果 superpower 或 search skill 有帮助，可以把它纳入回答",
-        `当前 persona: ${personaId}`,
-        `当前 persona 的显示名: ${activePersona.displayName}`,
-        activePersona.specialties.length > 0
-          ? `当前 persona 擅长: ${activePersona.specialties.join("、")}`
-          : "当前 persona 暂未配置专长标签",
-        "团队成员如下：",
-        ...teamRoster,
-        ...(collaborationNotes.length > 0
-          ? [
-              "这次已经拿到的队友内部意见：",
-              ...collaborationNotes.map(
-                (item) => `- ${item.persona.displayName} (${item.persona.id}): ${item.note}`
-              ),
-              "请把这些意见自然吸收进最终回答，不要像会议纪要那样逐条复读。"
-            ]
-          : [])
-      ]
-    };
-  }
-
-  private async getOrCreateSession(options: ChatRequestOptions): Promise<AgentSession> {
-    const soul = await this.loadPersonaSoul(options.personaId);
-
-    if (!options.sessionId) {
-      const session = this.createAgentSession();
-      session.setSoul(soul);
-      return session;
+    // 根据 skills 注册对应的 skill 实现
+    for (const skillName of skills) {
+      switch (skillName) {
+        case "search":
+        case "web_search":
+          if (process.env.MCP_SEARCH_URL?.trim()) {
+            session.registerSkill(
+              createCyberBowieSearchSkill(
+                createMcpSearchRuntime({
+                  serverUrl: process.env.MCP_SEARCH_URL.trim(),
+                  toolName: process.env.MCP_SEARCH_TOOL?.trim() || "bailian_web_search",
+                  authToken: process.env.MCP_SEARCH_AUTH_TOKEN?.trim() || undefined,
+                  authHeader: process.env.MCP_SEARCH_AUTH_HEADER?.trim() || undefined,
+                  resultCount: process.env.MCP_SEARCH_RESULT_COUNT
+                    ? Number(process.env.MCP_SEARCH_RESULT_COUNT)
+                    : 10
+                })
+              )
+            );
+          }
+          break;
+        case "superpower":
+          session.registerSkill(superpowerSkill);
+          break;
+        default:
+          // 其他 skills 后续扩展
+          break;
+      }
     }
 
-    const sessionKey = this.buildSessionKey(options);
-    const existing = this.sessions.get(sessionKey);
-    if (existing) {
-      existing.updatedAt = Date.now();
-      existing.session.setSoul(soul);
-      return existing.session;
-    }
-
-    const session = this.createAgentSession();
+    // 加载 soul
+    const soul = await this.loadPersonaSoul(personaId);
     session.setSoul(soul);
-    this.sessions.set(sessionKey, {
-      session,
-      updatedAt: Date.now()
-    });
-    this.cleanupSessions();
+
     return session;
   }
 
-  private cleanupSessions(): void {
-    const now = Date.now();
-    const maxAgeMs = 1000 * 60 * 60 * 6;
-
-    for (const [sessionId, context] of this.sessions.entries()) {
-      if (now - context.updatedAt > maxAgeMs) {
-        this.sessions.delete(sessionId);
-      }
+  /**
+   * 执行单个 persona 的任务
+   */
+  private async executePersona(
+    personaId: string,
+    message: string,
+    sharedContext: Record<string, string>
+  ): Promise<{ personaId: string; displayName: string; text: string; sharedData?: Record<string, unknown> }> {
+    const session = await this.createPersonaSession(personaId);
+    
+    // 设置共享上下文
+    if (Object.keys(sharedContext).length > 0) {
+      session.setSharedContext(sharedContext);
     }
-  }
 
-  public async getSkillsAndSoul(personaId?: string): Promise<{
-    skills: ReturnType<AgentSession["listSkills"]>;
-    soul: string;
-    personas: PersonaDefinition[];
-  }> {
-    const session = this.createAgentSession();
-    const soul = await this.loadPersonaSoul(personaId);
     const personas = await this.listPersonas();
+    const persona = personas.find(p => p.id === normalizePersonaId(personaId));
+
+    const result = await session.run({
+      goal: message,
+      constraints: [
+        "所有输出都使用中文",
+        "给出完整、有用的回答",
+        "如果有 skill 结果，自然地融入回答中"
+      ],
+      context: [
+        `你是 ${persona?.displayName || personaId}`,
+        persona?.introduction ? `定位: ${persona.introduction}` : "",
+        persona?.specialties?.length ? `专长: ${persona.specialties.join("、")}` : ""
+      ].filter(Boolean)
+    });
 
     return {
-      skills: session.listSkills(),
-      soul,
-      personas
+      personaId,
+      displayName: persona?.displayName || personaId,
+      text: result.raw,
+      sharedData: result.skillResults.length > 0 
+        ? Object.fromEntries(result.skillResults.map(s => [s.skillName, s.summary]))
+        : undefined
     };
   }
 
+  /**
+   * Orchestrator 模式：决定需要哪些 persona，并行/串行执行
+   * 支持即时发送（通过 AsyncIterable）
+   */
+  public async *orchestrateReply(
+    message: string,
+    options: ChatRequestOptions = {}
+  ): AsyncIterable<{
+    type: "announce" | "message";
+    personaId?: string;
+    displayName?: string;
+    text: string;
+  }> {
+    const personas = await this.listPersonas();
+    const orchestrator = new Orchestrator(this.providerFactory(), personas);
+
+    // 1. 创建执行计划
+    const plan = await orchestrator.createPlan(message);
+    console.log("[Orchestrator] Plan:", JSON.stringify(plan, null, 2));
+
+    // 2. 执行开场白
+    const announceStep = plan.steps.find(s => s.type === 'announce');
+    if (announceStep && announceStep.type === 'announce') {
+      yield {
+        type: "announce",
+        text: announceStep.text
+      };
+    }
+
+    // 3. 收集所有 persona 步骤
+    const personaSteps = plan.steps.filter(s => s.type === 'persona') as Array<ExecutionStep & { type: 'persona'; personaId: string }>;
+    
+    // 4. 按依赖关系执行
+    const sharedContext: Record<string, string> = {};
+    const completedPersonas = new Set<string>();
+
+    // 分离有依赖和无依赖的步骤
+    const independentSteps = personaSteps.filter(s => s.dependsOn.length === 0);
+    const dependentSteps = personaSteps.filter(s => s.dependsOn.length > 0);
+
+    // 4.1 并行执行无依赖的 persona
+    if (independentSteps.length > 0) {
+      const promises = independentSteps.map(async (step) => {
+        const result = await this.executePersona(step.personaId, message, sharedContext);
+        
+        // 更新共享上下文
+        if (result.sharedData) {
+          for (const [key, value] of Object.entries(result.sharedData)) {
+            sharedContext[key] = String(value);
+          }
+        }
+        completedPersonas.add(step.personaId);
+        
+        return result;
+      });
+
+      // 谁先完成谁先 yield（不按顺序）
+      for (const promise of promises) {
+        const result = await promise;
+        yield {
+          type: "message",
+          personaId: result.personaId,
+          displayName: result.displayName,
+          text: result.text
+        };
+      }
+    }
+
+    // 4.2 执行有依赖的 persona（串行，等待依赖完成）
+    for (const step of dependentSteps) {
+      // 等待依赖完成
+      for (const dep of step.dependsOn) {
+        while (!completedPersonas.has(dep)) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
+      // 执行
+      const result = await this.executePersona(step.personaId, message, sharedContext);
+      
+      if (result.sharedData) {
+        for (const [key, value] of Object.entries(result.sharedData)) {
+          sharedContext[key] = String(value);
+        }
+      }
+      completedPersonas.add(step.personaId);
+
+      yield {
+        type: "message",
+        personaId: result.personaId,
+        displayName: result.displayName,
+        text: result.text
+      };
+    }
+  }
+
+  /**
+   * 兼容旧接口：单条回复
+   */
   public async buildReply(message: string, options: ChatRequestOptions = {}): Promise<{
     reply: string;
     skills: string[];
   }> {
-    const runInput = await this.buildRunInput(message, options);
-    const session = await this.getOrCreateSession(options);
+    const messages: string[] = [];
+    const skills: string[] = [];
 
-    const result = await session.run({
-      goal: message,
-      constraints: runInput.constraints,
-      context: runInput.context
-    });
-
-    const skillBlock =
-      result.skillResults.length > 0
-        ? [
-            "",
-            "这次用到的能力：",
-            ...result.skillResults.map((skill) => `- ${skill.skillName}: ${skill.summary}`)
-          ].join("\n")
-        : "";
-    const collaborationBlock =
-      runInput.collaborationNotes.length > 0
-        ? [
-            "",
-            `这次一起参与思考的人格：${runInput.collaborationNotes
-              .map((item) => item.persona.displayName)
-              .join("、")}`
-          ].join("\n")
-        : "";
+    for await (const item of this.orchestrateReply(message, options)) {
+      if (item.type === "announce") {
+        messages.push(`[呱吉] ${item.text}`);
+      } else {
+        messages.push(`[${item.displayName}] ${item.text}`);
+      }
+    }
 
     return {
-      reply: `${result.raw}${skillBlock}${collaborationBlock}`,
-      skills: result.skillResults.map((skill) => skill.skillName)
+      reply: messages.join("\n\n"),
+      skills
     };
   }
 
-  public async *streamReply(
-    message: string,
-    options: ChatRequestOptions = {}
-  ): AsyncIterable<{
-    type: "delta" | "skills" | "done";
-    textDelta?: string;
-    skills?: string[];
+  public async getSkillsAndSoul(personaId?: string): Promise<{
+    skills: string[];
+    soul: string;
+    personas: PersonaDefinition[];
   }> {
-    const runInput = await this.buildRunInput(message, options);
-    const session = await this.getOrCreateSession(options);
+    const session = await this.createPersonaSession(personaId || "bowie");
+    const soul = await this.loadPersonaSoul(personaId);
+    const personas = await this.listPersonas();
 
-    let latestSkillNames: string[] = [];
-
-    if (runInput.collaborationNotes.length > 0) {
-      yield {
-        type: "delta",
-        textDelta: `我先把 ${runInput.collaborationNotes
-          .map((item) => item.persona.displayName)
-          .join("、")} 拉进来一起看一下。\n\n`
-      };
-    }
-
-    for await (const event of session.runStream({
-      goal: message,
-      constraints: runInput.constraints,
-      context: runInput.context
-    })) {
-      latestSkillNames = event.skillResults.map((skill) => skill.skillName);
-      yield {
-        type: "delta",
-        textDelta: event.chunk.textDelta
-      };
-    }
-
-    if (latestSkillNames.length > 0) {
-      yield {
-        type: "skills",
-        skills: latestSkillNames
-      };
-    }
-
-    if (runInput.collaborationNotes.length > 0) {
-      yield {
-        type: "delta",
-        textDelta: `\n\n这次一起参与思考的人格：${runInput.collaborationNotes
-          .map((item) => item.persona.displayName)
-          .join("、")}`
-      };
-    }
-
-    yield {
-      type: "done"
+    return {
+      skills: session.listSkills().map(s => s.name),
+      soul,
+      personas
     };
   }
 }

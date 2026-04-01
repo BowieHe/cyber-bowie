@@ -35,23 +35,20 @@ async function createFixture(): Promise<string> {
           {
             id: "bowie",
             displayName: "呱吉",
-            specialties: ["产品方向", "项目拆分"],
-            collaborators: ["critic", "researcher"],
-            collaborationMode: "auto"
+            skills: ["orchestrate", "default_chat"],
+            specialties: ["产品方向", "项目拆分"]
           },
           {
             id: "critic",
             displayName: "挑刺版呱吉",
-            specialties: ["风险识别"],
-            collaborators: ["bowie"],
-            collaborationMode: "manual"
+            skills: ["risk_analysis", "logic_check"],
+            specialties: ["风险识别"]
           },
           {
             id: "researcher",
             displayName: "研究版呱吉",
-            specialties: ["资料整理"],
-            collaborators: ["bowie"],
-            collaborationMode: "auto"
+            skills: ["search", "deep_research"],
+            specialties: ["资料整理"]
           }
         ]
       },
@@ -120,48 +117,58 @@ test("ChatService 会列出根 persona 和 souls 目录里的 persona", async ()
     "产品方向",
     "项目拆分"
   ]);
-  assert.deepEqual(personas.find((persona) => persona.id === "bowie")?.collaborators, [
-    "critic",
-    "researcher"
+  assert.deepEqual(personas.find((persona) => persona.id === "bowie")?.skills, [
+    "orchestrate",
+    "default_chat"
   ]);
 });
 
-test("ChatService 会在复杂问题下拉队友一起协作", async () => {
+test("ChatService 会使用 Orchestrator 模式生成多条消息", async () => {
   const cwd = await createFixture();
-  const prompts: string[] = [];
-
   const service = new ChatService({
     cwd,
     providerFactory: () => ({
-      name: "collab-provider",
+      name: "orchestrator-provider",
       async complete(request) {
         const prompt = request.messages[request.messages.length - 1]?.content ?? "";
-        prompts.push(prompt);
-
-        if (prompt.includes("只给队友看的内部意见")) {
-          const persona = /你的 persona: ([^(]+)\s*\(/.exec(prompt)?.[1]?.trim() ?? "队友";
+        
+        // 模拟 Orchestrator 返回执行计划
+        if (prompt.includes("调度中心") || prompt.includes("你是调度中心")) {
           return {
-            text: `${persona}内部意见：这里是从我专长出发的建议。`,
-            model: "collab-provider"
+            text: JSON.stringify({
+              reasoning: "需要搜索和分析",
+              steps: [
+                { type: "announce", text: "我安排研究型和挑刺型一起看看" },
+                { type: "persona", personaId: "researcher", dependsOn: [] },
+                { type: "persona", personaId: "critic", dependsOn: [] }
+              ]
+            }),
+            model: "orchestrator-provider"
           };
         }
-
+        
+        // 其他 persona 的回复
         return {
-          text: prompt.includes("这次已经拿到的队友内部意见")
-            ? "主答人格已整合队友意见，给出最终方案。"
-            : "主答人格独立回答。",
-          model: "collab-provider"
+          text: `回复：${prompt.substring(0, 30)}...`,
+          model: "orchestrator-provider"
         };
       }
     })
   });
 
-  const result = await service.buildReply("帮我分析这个项目怎么拆模块、风险在哪、研究路线怎么铺。", {
+  const messages: string[] = [];
+  for await (const item of service.orchestrateReply("帮我分析这个项目", {
     personaId: "bowie",
-    sessionId: "team-session"
-  });
+    sessionId: "test-session"
+  })) {
+    if (item.type === "announce") {
+      messages.push(`[Orchestrator] ${item.text}`);
+    } else {
+      messages.push(`[${item.displayName}] ${item.text}`);
+    }
+  }
 
-  assert.match(result.reply, /主答人格已整合队友意见/);
-  assert.match(result.reply, /这次一起参与思考的人格：挑刺版呱吉、研究版呱吉/);
-  assert.equal(prompts.filter((prompt) => prompt.includes("只给队友看的内部意见")).length, 2);
+  assert.ok(messages.length >= 3, "应该生成多条消息");
+  assert.ok(messages.some(m => m.includes("研究型")), "应该包含研究型回复");
+  assert.ok(messages.some(m => m.includes("挑刺型")), "应该包含挑刺型回复");
 });

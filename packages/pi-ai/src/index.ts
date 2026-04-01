@@ -7,6 +7,16 @@ export interface CompletionRequest {
   messages: CompletionMessage[];
   temperature?: number;
   maxTokens?: number;
+  /**
+   * 使用轻量级模型进行快速推理
+   * 如果为 true，provider 应该使用更快、更便宜的模型
+   */
+  useLightweightModel?: boolean;
+  /**
+   * 是否启用 thinking/reasoning 模式
+   * 如果为 false，应该关闭 thinking 以获得更快的响应
+   */
+  enableThinking?: boolean;
 }
 
 export interface CompletionResponse {
