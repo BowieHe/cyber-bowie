@@ -1,4 +1,4 @@
-import type { AgentSkill, AgentTask, SkillResult } from "@cyber-bowie/pi-agent-core";
+import type { AgentSkill, AgentTask, SkillResult } from "@cyber-persona/pi-agent-core";
 
 export class SuperpowerSkill implements AgentSkill {
   public readonly metadata = {

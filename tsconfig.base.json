@@ -8,28 +8,28 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@cyber-bowie/pi-ai": [
+      "@cyber-persona/pi-ai": [
         "packages/pi-ai/src/index.ts"
       ],
-      "@cyber-bowie/pi-agent-core": [
+      "@cyber-persona/pi-agent-core": [
         "packages/pi-agent-core/src/index.ts"
       ],
-      "@cyber-bowie/pi-coding-agent": [
+      "@cyber-persona/pi-coding-agent": [
         "packages/pi-coding-agent/src/index.ts"
       ],
-      "@cyber-bowie/pi-skills-superpower": [
+      "@cyber-persona/pi-skills-superpower": [
         "packages/pi-skills-superpower/src/index.ts"
       ],
-      "@cyber-bowie/pi-skills-search": [
+      "@cyber-persona/pi-skills-search": [
         "packages/pi-skills-search/src/index.ts"
       ],
-      "@cyber-bowie/pi-server": [
+      "@cyber-persona/pi-server": [
         "packages/pi-server/src/index.ts"
       ],
-      "@cyber-bowie/pi-channel-telegram": [
+      "@cyber-persona/pi-channel-telegram": [
         "packages/pi-channel-telegram/src/index.ts"
       ],
-      "@cyber-bowie/pi-web-chat": [
+      "@cyber-persona/pi-web-chat": [
         "packages/pi-web-chat/web/src/main.tsx"
       ]
     },

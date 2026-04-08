@@ -1,5 +1,5 @@
 {
-  "name": "@cyber-bowie/pi-tui",
+  "name": "@cyber-persona/pi-tui",
   "version": "0.1.0",
   "description": "Terminal UI for debugging cyber-bowie sessions",
   "type": "module",

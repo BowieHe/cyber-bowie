@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AiProvider, CompletionRequest, CompletionResponse } from "@cyber-bowie/pi-ai";
+import type { AiProvider, CompletionRequest, CompletionResponse } from "@cyber-persona/pi-ai";
 import { ChatService, loadSoulTextForPersona } from "./chat-service.js";
 
 class RecordingProvider implements AiProvider {

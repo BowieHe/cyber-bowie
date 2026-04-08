@@ -350,7 +350,6 @@ export function startTelegramPolling(
             controllers.add(controller);
 
             try {
-              log("info", "Polling for updates", { offset, personaId: config.personaId });
               const updates = await telegramRequest<TelegramApiUpdate[]>(
                 bot.token,
                 "getUpdates",
@@ -361,7 +360,6 @@ export function startTelegramPolling(
                 },
                 controller.signal
               );
-              log("info", "Received updates", { count: updates.length, personaId: config.personaId });
 
               for (const update of updates) {
                 offset = Math.max(offset, update.update_id + 1);

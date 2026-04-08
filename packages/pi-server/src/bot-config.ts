@@ -4,10 +4,14 @@
  * Max 4 bots allowed
  */
 
+import fs from "node:fs";
+import path from "node:path";
+
 export interface BotConfig {
   personaId: string;
   token: string; // Telegram bot token (can use ${ENV_VAR} syntax)
   displayName?: string;
+  mode?: 'always' | 'private-or-mention';
   // Runtime populated
   username?: string;
 }
@@ -33,15 +37,12 @@ function resolveEnvVar(value: string): string {
 
 export function loadBotConfig(configPath?: string): BotConfig[] {
   // Try to load from bots.json or fallback to env-based config
-  const fs = require("fs");
-  const path = require("path");
-
   const pathsToTry = [
     configPath,
     process.env.BOTS_CONFIG,
     path.join(process.cwd(), "bots.json"),
     path.join(process.cwd(), "config", "bots.json")
-  ].filter(Boolean);
+  ].filter((p): p is string => typeof p === "string");
 
   for (const p of pathsToTry) {
     if (fs.existsSync(p)) {

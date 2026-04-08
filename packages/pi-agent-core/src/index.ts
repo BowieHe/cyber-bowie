@@ -1,7 +1,7 @@
 import type {
   AiProvider,
   CompletionMessage
-} from "@cyber-bowie/pi-ai";
+} from "@cyber-persona/pi-ai";
 
 export interface AgentTask {
   goal: string;

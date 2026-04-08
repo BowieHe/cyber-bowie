@@ -2,17 +2,17 @@
 
 import { resolve } from "node:path";
 import { config as loadEnv } from "dotenv";
-import { OpenAiProvider } from "@cyber-bowie/pi-ai";
+import { OpenAiProvider } from "@cyber-persona/pi-ai";
 import {
   AgentSession,
   createDefaultSystemPrompt,
   loadSoulFile
-} from "@cyber-bowie/pi-agent-core";
+} from "@cyber-persona/pi-agent-core";
 import {
   createCyberBowieSearchSkill,
   createMcpSearchRuntime
-} from "@cyber-bowie/pi-skills-search";
-import { superpowerSkill } from "@cyber-bowie/pi-skills-superpower";
+} from "@cyber-persona/pi-skills-search";
+import { superpowerSkill } from "@cyber-persona/pi-skills-superpower";
 
 loadEnv({
   path: resolve(process.cwd(), ".env"),

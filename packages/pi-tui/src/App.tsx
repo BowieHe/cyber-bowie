@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text, useInput, useApp, useStdin } from 'ink';
 import { DebugClient, type SessionInfo, type DebugEvent } from './client.js';
 import { SessionList } from './components/SessionList.js';
 import { EventStream } from './components/EventStream.js';
 import { SteeringInput } from './components/SteeringInput.js';
+import { appendFileSync } from 'node:fs';
 
 const POLL_INTERVAL = 2000; // 2 seconds
+
+// Debug logger that writes to file (since console is captured by Ink)
+const debugLog = (msg: string) => {
+  appendFileSync('/tmp/pi-tui-debug.log', `${new Date().toISOString()} ${msg}\n`);
+};
 
 export function App() {
   const { exit } = useApp();
@@ -57,7 +63,11 @@ export function App() {
 
   // Keyboard handling
   useInput((input, key) => {
+    // Debug logging to file
+    debugLog(`Input received: input="${input}", key=${JSON.stringify(key)}`);
+
     if (key.escape || (key.ctrl && input === 'c')) {
+      debugLog('Exit triggered');
       exit();
       return;
     }

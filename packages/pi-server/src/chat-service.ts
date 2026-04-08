@@ -1,6 +1,6 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { OpenAiProvider, type AiProvider } from "@cyber-bowie/pi-ai";
+import { OpenAiProvider, type AiProvider } from "@cyber-persona/pi-ai";
 import {
   AgentSession,
   createDefaultSystemPrompt,
@@ -8,12 +8,12 @@ import {
   Orchestrator,
   type ExecutionPlan,
   type ExecutionStep
-} from "@cyber-bowie/pi-agent-core";
+} from "@cyber-persona/pi-agent-core";
 import {
   createCyberBowieSearchSkill,
   createMcpSearchRuntime
-} from "@cyber-bowie/pi-skills-search";
-import { superpowerSkill } from "@cyber-bowie/pi-skills-superpower";
+} from "@cyber-persona/pi-skills-search";
+import { superpowerSkill } from "@cyber-persona/pi-skills-superpower";
 import { debugAPI } from "./debug-api.js";
 
 export interface ChatServiceConfig {

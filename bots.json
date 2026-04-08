@@ -4,7 +4,8 @@
     {
       "personaId": "bowie",
       "displayName": "呱吉",
-      "token": "${MAIN_BOT_TOKEN}"
+      "token": "${MAIN_BOT_TOKEN}",
+      "mode": "always"
     },
     {
       "personaId": "researcher",

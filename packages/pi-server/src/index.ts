@@ -6,7 +6,7 @@ import { config as loadEnv } from "dotenv";
 import {
   createTelegramSessionId,
   startTelegramPolling
-} from "@cyber-bowie/pi-channel-telegram";
+} from "@cyber-persona/pi-channel-telegram";
 import { loadBotConfig, validateBotsConfig } from "./bot-config.js";
 import { ChatService } from "./chat-service.js";
 import { initCronJobs } from "./cron.js";
@@ -95,7 +95,14 @@ async function main(): Promise<void> {
             const sessionId = createTelegramSessionId(event.message);
             
             console.log(`[Telegram] Received message: ${message.text.substring(0, 50)}...`);
-            
+            console.log(`[Telegram] Message details:`, {
+              chatType: message.chatType,
+              mentions: message.mentions,
+              botUsername: bot.username,
+              botPersonaId: bot.personaId,
+              sessionId
+            });
+
             // Group 消息路由逻辑
             if (message.chatType === 'group' || message.chatType === 'supergroup') {
               // 检查是否 @mention 了某个 bot
