@@ -1,3 +1,18 @@
+Metadata-Version: 2.4
+Name: cyber-persona
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.135.3
+Requires-Dist: httpx>=0.28.1
+Requires-Dist: langchain>=1.2.15
+Requires-Dist: langchain-openai>=1.1.12
+Requires-Dist: langgraph>=1.1.6
+Requires-Dist: python-dotenv>=1.2.2
+Requires-Dist: rich>=14.3.4
+Requires-Dist: uvicorn>=0.44.0
+
 # Cyber-Persona (Python)
 
 Simple LangGraph + WebSocket + Rich TUI demo.

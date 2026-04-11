@@ -15,7 +15,30 @@ const debugLog = (msg: string) => {
 
 export function App() {
   const { exit } = useApp();
+  const { stdin, setRawMode } = useStdin();
   const [client] = useState(() => new DebugClient());
+  const [inputMode, setInputMode] = useState<'raw' | 'readline' | 'none'>('raw');
+
+  // Enable raw mode for keyboard input
+  useEffect(() => {
+    // Check if stdin is a TTY
+    const isTTY = process.stdin.isTTY;
+    debugLog(`stdin.isTTY: ${isTTY}`);
+
+    if (isTTY && setRawMode) {
+      try {
+        setRawMode(true);
+        debugLog('Raw mode enabled successfully');
+        setInputMode('raw');
+      } catch (err) {
+        debugLog(`Failed to enable raw mode: ${err}`);
+        setInputMode('none');
+      }
+    } else {
+      debugLog('Raw mode NOT supported (stdin is not TTY)');
+      setInputMode('none');
+    }
+  }, [setRawMode]);
 
   // State
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -66,7 +89,7 @@ export function App() {
     // Debug logging to file
     debugLog(`Input received: input="${input}", key=${JSON.stringify(key)}`);
 
-    if (key.escape || (key.ctrl && input === 'c')) {
+    if (key.escape || input === 'q' || (key.ctrl && input === 'c')) {
       debugLog('Exit triggered');
       exit();
       return;
@@ -141,7 +164,11 @@ export function App() {
         {!isInputActive && (
           <Box padding={1}>
             <Text color="gray">
-              ↑↓ Navigate | s: Steering | ESC/q: Quit
+              {inputMode === 'raw'
+                ? '↑↓ Navigate | s: Steering | ESC/q: Quit'
+                : inputMode === 'readline'
+                ? 'Type "q" or "quit" to exit (readline mode)'
+                : 'Keyboard input not available'}
             </Text>
           </Box>
         )}

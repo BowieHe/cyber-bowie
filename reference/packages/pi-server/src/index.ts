@@ -105,17 +105,17 @@ async function main(): Promise<void> {
 
             // Group 消息路由逻辑
             if (message.chatType === 'group' || message.chatType === 'supergroup') {
-              // 检查是否 @mention 了某个 bot
-              const mentionedUsername = message.mentions[0]; // 取第一个 @mention
+              // 检查是否 @mention 了当前 bot（检查所有 mentions）
+              const myUsername = bot.username?.toLowerCase();
+              const isMentioned = myUsername && message.mentions.includes(myUsername);
 
-              if (mentionedUsername) {
-                // 如果 @mention 了其他 bot，当前 bot 忽略
-                const myUsername = bot.username?.toLowerCase();
-                if (myUsername && mentionedUsername !== myUsername) {
-                  console.log(`[Telegram] Ignoring: message is for @${mentionedUsername}`);
-                  return undefined;
-                }
-              } else {
+              if (message.mentions.length > 0 && !isMentioned) {
+                // 消息有 @mention 但没 @我，忽略
+                console.log(`[Telegram] Ignoring: message mentions [${message.mentions.join(',')}], not me (@${myUsername})`);
+                return undefined;
+              }
+
+              if (message.mentions.length === 0) {
                 // 没有 @mention，只有主 bot (bowie) 处理，避免重复响应
                 if (bot.personaId !== 'bowie') {
                   console.log(`[Telegram] Ignoring: no mention, only bowie responds`);
