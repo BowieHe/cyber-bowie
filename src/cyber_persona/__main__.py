@@ -1,24 +1,38 @@
-"""Entry point."""
+"""Entry point for Cyber Persona CLI."""
+
 import subprocess
 import sys
 import time
 
+from cyber_persona.config import get_settings
+from cyber_persona.server.app import create_app
+
 
 def run_server():
-    """Run the SSE server."""
+    """Run the HTTP server."""
     import uvicorn
-    from cyber_persona.server.ws_server import app
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
+    settings = get_settings()
+    app = create_app()
+
+    uvicorn.run(
+        app,
+        host=settings.server.host,
+        port=settings.server.port,
+        log_level=settings.server.log_level,
+    )
 
 
 def run_tui():
     """Run the TUI client."""
-    from cyber_persona.client.tui import main
-    main()
+    from cyber_persona.client import ChatUI
+
+    ui = ChatUI()
+    ui.run()
 
 
 def run_dev():
-    """Run both server and TUI."""
+    """Run both server and TUI in dev mode."""
     print("🚀 Starting dev mode (server + TUI)...")
     print("   Press Ctrl+C to stop both\n")
 
@@ -43,15 +57,20 @@ def run_dev():
         print("✓ Dev mode stopped")
 
 
+def print_usage():
+    """Print usage information."""
+    print("Usage: cp [server|tui|dev]")
+    print("")
+    print("Commands:")
+    print("  server  - Start HTTP server only")
+    print("  tui     - Start TUI client only (server must be running)")
+    print("  dev     - Start both server and TUI")
+
+
 def main():
-    """Main entry point for CLI."""
+    """Main entry point."""
     if len(sys.argv) < 2:
-        print("Usage: cp [server|tui|dev]")
-        print("")
-        print("Commands:")
-        print("  server  - Start WebSocket server only")
-        print("  tui     - Start TUI client only (server must be running)")
-        print("  dev     - Start both server and TUI")
+        print_usage()
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -64,7 +83,7 @@ def main():
         run_dev()
     else:
         print(f"Unknown command: {cmd}")
-        print("Usage: cp [server|tui|dev]")
+        print_usage()
         sys.exit(1)
 
 

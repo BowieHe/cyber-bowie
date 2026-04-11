@@ -1,33 +1,29 @@
-"""SSE server for streaming responses."""
+"""Chat endpoints."""
+
 import json
 import traceback
-from fastapi import FastAPI, Request
+from typing import Any
+
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
+from langgraph.graph import StateGraph
 
-app = FastAPI()
+from cyber_persona.server.deps import get_graph
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-@app.post("/chat")
-async def chat_endpoint(request: Request):
+@router.post("")
+async def chat_endpoint(
+    request: Request,
+    graph: StateGraph = Depends(get_graph),
+) -> StreamingResponse:
     """Stream chat responses using SSE."""
     data = await request.json()
     message = data.get("message", "")
     messages = data.get("messages", [])
 
-    from cyber_persona.core.graph import create_graph
-    graph = create_graph()
-
-    async def event_stream():
+    async def event_stream() -> AsyncGenerator[str, None]:
         try:
             async for event in graph.astream({"input": message, "messages": messages}):
                 node_name = list(event.keys())[0]
