@@ -1,4 +1,4 @@
-"""Research supervisor subgraph assembly.
+"""Research orchestrator subgraph assembly.
 
 Flow:
     plan -> gather -> reflect -> router
@@ -17,10 +17,10 @@ from cyber_persona.engine.nodes.research_supervisor.router import research_super
 from cyber_persona.models import AssistantState
 
 
-def create_research_supervisor_subgraph(
+def create_research_orchestrator_subgraph(
     llm: ChatOpenAI | None = None,
 ) -> CompiledStateGraph:
-    """Build the research supervisor subgraph.
+    """Build the research orchestrator subgraph.
 
     Flow:
         plan -> gather -> reflect -> router
@@ -47,3 +47,7 @@ def create_research_supervisor_subgraph(
     builder.set_entry_point("plan")
 
     return builder.compile()
+
+
+# Backward-compatible alias
+create_research_supervisor_subgraph = create_research_orchestrator_subgraph

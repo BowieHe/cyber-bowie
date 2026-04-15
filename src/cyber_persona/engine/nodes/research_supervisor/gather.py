@@ -10,7 +10,7 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 
-from cyber_persona.engine.nodes.research_sub_agent.graph import create_research_sub_agent
+from cyber_persona.engine.nodes.research_sub_agent.graph import create_search_agent
 from cyber_persona.models import AssistantState
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def _run_sub_agent(
 def gather_node(llm: ChatOpenAI | None = None):
     """Factory for the gather node."""
     # Build once per gather node instance
-    sub_agent = create_research_sub_agent(llm)
+    sub_agent = create_search_agent(llm)
 
     async def _node(state: AssistantState) -> dict[str, Any]:
         topics = state.get("research_plan", [])

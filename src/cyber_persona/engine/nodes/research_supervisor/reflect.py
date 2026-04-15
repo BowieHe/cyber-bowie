@@ -76,6 +76,7 @@ def reflect_node(llm: ChatOpenAI | None = None):
             "current_harness_status": evaluation.status,
             "missing_information": evaluation.missing_information or "",
             "status_message": f"信息评估: {evaluation.status}",
+            "next_agent": "drafter" if evaluation.status in ("PASSED", "PARTIAL_ACCEPT") else None,
         }
 
         if evaluation.status == "NEEDS_RETRY" and evaluation.correction_directive:
