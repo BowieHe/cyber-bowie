@@ -1,5 +1,6 @@
 """Terminal UI using Rich."""
 
+import httpx
 from typing import Any
 
 from rich.console import Console
@@ -53,20 +54,26 @@ class ChatUI:
         for name, info in self.nodes.items():
             icon = "✅" if info["status"] == "done" else "⏳"
             node = tree.add(f"{icon} [bold]{name}[/] ({info['status']})")
-            if "output" in info:
-                output = info["output"][:60]
-                if len(info["output"]) > 60:
+            # Prefer status_message for concise display
+            display_output = info.get("status_message") or info.get("output", "")
+            if display_output:
+                output = display_output[:60]
+                if len(display_output) > 60:
                     output += "..."
                 node.add(f"[dim]{output}[/dim]")
         self.console.print(tree)
         self.console.print()
 
-    def update_node(self, name: str, status: str, output: str = "") -> None:
+    def update_node(self, name: str, status: str, output: str = "", status_message: str = "") -> None:
         """Update node status."""
         # Mark all previous nodes as done
         for n in self.nodes:
             self.nodes[n]["status"] = "done"
-        self.nodes[name] = {"status": status, "output": output}
+        self.nodes[name] = {
+            "status": status,
+            "output": output,
+            "status_message": status_message,
+        }
 
     def get_input(self) -> str:
         """Get user input."""
@@ -80,8 +87,14 @@ class ChatUI:
                 event.node or "unknown",
                 "running",
                 node_data.get("output", ""),
+                node_data.get("status_message", ""),
             )
-            return node_data.get("llm_response", node_data.get("output", ""))
+            # Prefer final_answer for research path, fallback to output / llm_response
+            return (
+                node_data.get("final_answer")
+                or node_data.get("llm_response")
+                or node_data.get("output", "")
+            )
 
         elif event.type == "error":
             self.print_error(f"Server error: {event.message or 'Unknown'}")
@@ -118,11 +131,18 @@ class ChatUI:
         # Display results
         self.print_user(user_input)
         self.print_execution_tree()
-        self.print_ai(final_output)
+
+        if not final_output.strip():
+            self.print_error(
+                "Server returned an empty response. Please retry or restart the server."
+            )
+        else:
+            self.print_ai(final_output)
 
         # Save to message history
         self.messages.append({"role": "user", "content": user_input})
-        self.messages.append({"role": "assistant", "content": final_output})
+        if final_output.strip():
+            self.messages.append({"role": "assistant", "content": final_output})
 
         return final_output
 

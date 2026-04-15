@@ -3,16 +3,26 @@
 from functools import lru_cache
 from typing import AsyncGenerator
 
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
 from cyber_persona.config import get_settings
 from cyber_persona.engine import create_graph
+from cyber_persona.tools import SearchTool
 
 
 @lru_cache()
 def get_graph() -> StateGraph:
     """Get or create cached graph instance."""
-    return create_graph()
+    settings = get_settings()
+    llm = ChatOpenAI(
+        model=settings.llm.model,
+        api_key=settings.llm.api_key,
+        base_url=settings.llm.base_url,
+        temperature=settings.llm.temperature,
+    )
+    search_tool = SearchTool()
+    return create_graph(llm=llm, search_tool=search_tool)
 
 
 async def get_graph_async() -> AsyncGenerator[StateGraph, None]:

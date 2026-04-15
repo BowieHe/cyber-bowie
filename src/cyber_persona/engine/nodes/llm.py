@@ -1,5 +1,6 @@
 """LLM call node."""
 
+import logging
 from typing import Any
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -7,6 +8,8 @@ from langchain_openai import ChatOpenAI
 
 from cyber_persona.engine.nodes.base import BaseNode
 from cyber_persona.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class LLMNode(BaseNode):
@@ -51,10 +54,12 @@ class LLMNode(BaseNode):
 
         # Convert and call LLM
         lc_messages = self._convert_messages(messages)
+        logger.info("Calling LLM model=%s with %d messages", llm.model_name, len(lc_messages))
         response = llm.invoke(lc_messages)
 
         # Extract content
         content = response.content if hasattr(response, "content") else str(response)
+        logger.info("LLM response length=%d preview=%r", len(content), content[:100])
 
         # Add assistant message to history
         messages.append({"role": "assistant", "content": content})
@@ -64,4 +69,5 @@ class LLMNode(BaseNode):
             "messages": messages,
             "llm_response": content,
             "output": content,
+            "current_node": self.name,
         }

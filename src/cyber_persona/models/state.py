@@ -1,33 +1,88 @@
 """Graph state definition."""
 
-from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypedDict, Annotated
+import operator
 
+
+class AssistantState(TypedDict, total=False):
+    """Unified state for the single research graph.
+
+    All fields are optional (total=False) to allow incremental state
+    construction by LangGraph. Use `create_default_state()` to obtain
+    a fully initialized dict.
+    """
+
+    # --- Input & Conversation ---
+    input: str
+    user_query: str
+    intent: str
+    messages: list[dict[str, Any]]
+
+    # --- Business Context ---
+    current_query: str
+    retrieved_context: Annotated[list[str], operator.add]
+    draft: str
+    debate_log: Annotated[list[str], operator.add]
+    final_answer: str
+
+    # --- Compatibility / Chat path ---
+    output: str
+    llm_response: str
+    error: str | None
+
+    # --- Harness Regulatory State ---
+    attempted_queries: Annotated[list[str], operator.add]
+    correction_log: Annotated[list[str], operator.add]
+    search_retry_count: int
+    draft_retry_count: int
+    debate_round: int
+    current_harness_status: str
+    missing_information: str
+    status_message: str
+
+
+def create_default_state() -> AssistantState:
+    """Create a fully initialized default state."""
+    return {
+        "input": "",
+        "user_query": "",
+        "intent": "",
+        "messages": [],
+        "current_query": "",
+        "retrieved_context": [],
+        "draft": "",
+        "debate_log": [],
+        "final_answer": "",
+        "output": "",
+        "llm_response": "",
+        "error": None,
+        "attempted_queries": [],
+        "correction_log": [],
+        "search_retry_count": 0,
+        "draft_retry_count": 0,
+        "debate_round": 0,
+        "current_harness_status": "",
+        "missing_information": "",
+        "status_message": "",
+    }
+
+
+# Legacy dataclass state (kept for backward compatibility with old BaseNode chain)
+from dataclasses import dataclass, field
 from cyber_persona.models.message import Message
 
 
 @dataclass
 class GraphState:
-    """State object passed between LangGraph nodes."""
+    """Legacy state object passed between simple chat graph nodes."""
 
-    # Input
     input_text: str = ""
-
-    # Conversation history
     messages: list[Message] = field(default_factory=list)
-
-    # Current processing
     current_node: str = ""
     node_outputs: dict[str, Any] = field(default_factory=dict)
-
-    # LLM response
     llm_response: str = ""
-
-    # Tool calls (for future tool support)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     tool_results: dict[str, Any] = field(default_factory=dict)
-
-    # Output
     output: str = ""
     error: str | None = None
 
@@ -48,6 +103,8 @@ class GraphState:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "GraphState":
         """Create from dictionary."""
+        from cyber_persona.models.message import Message
+
         messages = [
             Message.from_dict(m) for m in data.get("messages", [])
         ]

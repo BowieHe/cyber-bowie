@@ -1,8 +1,11 @@
 """Output formatting node."""
 
+import logging
 from typing import Any
 
 from cyber_persona.engine.nodes.base import BaseNode
+
+logger = logging.getLogger(__name__)
 
 
 class OutputNode(BaseNode):
@@ -17,7 +20,10 @@ class OutputNode(BaseNode):
         llm_response = state.get("llm_response", "")
         formatted = f"{self.prefix}{llm_response}"
 
+        logger.info("Formatted output: %r", formatted[:100])
+
         return {
             **state,
             "output": formatted,
+            "current_node": self.name,
         }

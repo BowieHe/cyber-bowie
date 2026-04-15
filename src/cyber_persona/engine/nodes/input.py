@@ -1,9 +1,12 @@
 """Input processing node."""
 
+import logging
 from typing import Any
 
 from cyber_persona.engine.nodes.base import BaseNode
 from cyber_persona.models.message import Message
+
+logger = logging.getLogger(__name__)
 
 
 class InputNode(BaseNode):
@@ -20,8 +23,11 @@ class InputNode(BaseNode):
         messages = state.get("messages", [])
         messages.append({"role": "user", "content": user_input})
 
+        logger.info("Input received: %r | Total messages: %d", user_input, len(messages))
+
         return {
             **state,
             "messages": messages,
             "input_text": user_input,
+            "current_node": self.name,
         }

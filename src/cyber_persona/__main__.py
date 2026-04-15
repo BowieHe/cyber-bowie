@@ -1,6 +1,7 @@
 """Entry point for Cyber Persona CLI."""
 
-import subprocess
+import multiprocessing
+import signal
 import sys
 import time
 
@@ -32,29 +33,25 @@ def run_tui():
 
 
 def run_dev():
-    """Run both server and TUI in dev mode."""
-    print("🚀 Starting dev mode (server + TUI)...")
-    print("   Press Ctrl+C to stop both\n")
+    """Run TUI and server together. Server stops when TUI exits."""
+    # Ignore SIGINT in parent so it propagates cleanly to children
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-    # Start server in subprocess
-    server_proc = subprocess.Popen(
-        [sys.executable, "-m", "cyber_persona", "server"],
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
+    process = multiprocessing.Process(target=run_server)
+    process.start()
 
-    # Wait for server to be ready
-    time.sleep(2)
+    # Wait briefly for server to come up before launching TUI
+    time.sleep(0.5)
 
     try:
-        # Start TUI in main process
         run_tui()
-    except KeyboardInterrupt:
-        print("\n🛑 Stopping...")
     finally:
-        server_proc.terminate()
-        server_proc.wait()
-        print("✓ Dev mode stopped")
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+            if process.is_alive():
+                process.kill()
+                process.join()
 
 
 def print_usage():
@@ -64,7 +61,7 @@ def print_usage():
     print("Commands:")
     print("  server  - Start HTTP server only")
     print("  tui     - Start TUI client only (server must be running)")
-    print("  dev     - Start both server and TUI")
+    print("  dev     - Start both server and TUI (server stops on exit)")
 
 
 def main():

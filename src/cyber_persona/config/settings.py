@@ -53,12 +53,40 @@ class ServerSettings:
         )
 
 
+@dataclass(frozen=True)
+class SearchSettings:
+    """Search tool configuration."""
+
+    server_url: str
+    tool_name: str
+    auth_token: str | None
+    auth_header: str
+    result_count: int
+
+    @classmethod
+    def from_env(cls) -> "SearchSettings":
+        """Create settings from environment variables."""
+        auth_token = os.getenv("SEARCH_AUTH_TOKEN")
+        # Allow empty string to be treated as None
+        if auth_token == "":
+            auth_token = None
+
+        return cls(
+            server_url=os.getenv("SEARCH_SERVER_URL", "http://localhost:3000"),
+            tool_name=os.getenv("SEARCH_TOOL_NAME", "bailian_web_search"),
+            auth_token=auth_token,
+            auth_header=os.getenv("SEARCH_AUTH_HEADER", "Authorization"),
+            result_count=int(os.getenv("SEARCH_RESULT_COUNT", "10")),
+        )
+
+
 class Settings:
     """Application settings container."""
 
     def __init__(self) -> None:
         self.llm = LLMSettings.from_env()
         self.server = ServerSettings.from_env()
+        self.search = SearchSettings.from_env()
         self.project_root = Path(__file__).parent.parent.parent.parent
 
         # Validate
