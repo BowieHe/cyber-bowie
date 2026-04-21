@@ -90,7 +90,7 @@ class SearchTool:
         return self._client
 
     async def search(self, query: str) -> list[SearchResultItem]:
-        """Execute search query.
+        """Execute search query via MCP JSON-RPC over HTTP.
 
         Args:
             query: Search query string.
@@ -100,50 +100,62 @@ class SearchTool:
         """
         client = await self._get_client()
 
-        # Build MCP tool call request
-        payload = {
-            "name": self.config.tool_name,
-            "arguments": {
-                "query": query,
-                "count": self.config.result_count,
+        logger.info(
+            "SearchTool querying=%r tool=%r server=%s",
+            query,
+            self.config.tool_name,
+            self.config.server_url,
+        )
+
+        # MCP requires an initialize handshake before any tool calls.
+        # 1. Send initialize request
+        init_payload = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "cyber-persona",
+                    "version": "1.0.0",
+                },
+            },
+        }
+        url = self.config.server_url.rstrip("/")
+        response = await client.post(url, json=init_payload)
+        response.raise_for_status()
+        init_data = response.json()
+        logger.info("SearchTool MCP initialize response: %s", init_data)
+
+        # 2. Send initialized notification
+        notify_payload = {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+        }
+        await client.post(url, json=notify_payload)
+
+        # 3. Build MCP tool call request (JSON-RPC 2.0)
+        tool_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": self.config.tool_name,
+                "arguments": {
+                    "query": query,
+                    "count": self.config.result_count,
+                },
             },
         }
 
-        logger.info(
-            "SearchTool querying=%r tool=%r endpoints=%s",
-            query,
-            self.config.tool_name,
-            self.config.endpoints,
-        )
+        response = await client.post(url, json=tool_payload)
+        response.raise_for_status()
 
-        last_error: Exception | None = None
-        for endpoint in self.config.endpoints:
-            try:
-                if endpoint:
-                    url = urljoin(self.config.server_url.rstrip("/") + "/", endpoint)
-                else:
-                    url = self.config.server_url.rstrip("/")
-                logger.info("SearchTool trying endpoint: %s", url)
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-
-                data = response.json()
-                results = self._parse_results(data)
-                logger.info("SearchTool success at %s with %d results", url, len(results))
-                return results
-
-            except (httpx.HTTPError, json.JSONDecodeError) as e:
-                logger.warning("SearchTool failed at %s: %s", url, e)
-                last_error = e
-                continue
-
-        # If all endpoints failed, raise the last error
-        if last_error:
-            raise RuntimeError(
-                f"Failed to call search tool on all endpoints: {last_error}"
-            )
-
-        return []
+        data = response.json()
+        results = self._parse_results(data)
+        logger.info("SearchTool success with %d results", len(results))
+        return results
 
     def _parse_results(self, data: dict[str, Any]) -> list[SearchResultItem]:
         """Parse MCP tool response into search results.
