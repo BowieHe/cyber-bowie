@@ -4,6 +4,7 @@ import multiprocessing
 import signal
 import sys
 import time
+import webbrowser
 
 from cyber_persona.config import get_settings
 from cyber_persona.server.app import create_app
@@ -24,27 +25,28 @@ def run_server():
     )
 
 
-def run_tui():
-    """Run the TUI client."""
-    from cyber_persona.client import ChatUI
-
-    ui = ChatUI()
-    ui.run()
-
-
 def run_dev():
-    """Run TUI and server together. Server stops when TUI exits."""
+    """Run server and auto-open browser. Server stops on interrupt."""
     # Ignore SIGINT in parent so it propagates cleanly to children
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     process = multiprocessing.Process(target=run_server)
     process.start()
 
-    # Wait briefly for server to come up before launching TUI
-    time.sleep(0.5)
+    # Wait briefly for server to come up before opening browser
+    time.sleep(0.8)
+
+    settings = get_settings()
+    url = f"http://localhost:{settings.server.port}"
+    print(f"Opening browser at {url} ...")
+    webbrowser.open(url)
 
     try:
-        run_tui()
+        # Keep parent alive until interrupted
+        while process.is_alive():
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
     finally:
         if process.is_alive():
             process.terminate()
@@ -56,12 +58,11 @@ def run_dev():
 
 def print_usage():
     """Print usage information."""
-    print("Usage: cp [server|tui|dev]")
+    print("Usage: cp [server|dev]")
     print("")
     print("Commands:")
-    print("  server  - Start HTTP server only")
-    print("  tui     - Start TUI client only (server must be running)")
-    print("  dev     - Start both server and TUI (server stops on exit)")
+    print("  server  - Start HTTP server (serves API + built frontend)")
+    print("  dev     - Start server and open browser")
 
 
 def main():
@@ -74,8 +75,6 @@ def main():
 
     if cmd == "server":
         run_server()
-    elif cmd == "tui":
-        run_tui()
     elif cmd == "dev":
         run_dev()
     else:
