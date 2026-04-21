@@ -56,6 +56,13 @@ class AssistantState(TypedDict, total=False):
     # --- Tool Call History ---
     tool_calls: Annotated[list[dict[str, Any]], operator.add]
 
+    # --- Plan-Driven Execution ---
+    plan: list[str]
+    plan_index: int
+    execution_log: Annotated[list[str], operator.add]
+    verification_results: list[dict[str, Any]]
+    step_retry_count: int
+
 
 def create_default_state() -> AssistantState:
     """Create a fully initialized default state."""
@@ -88,6 +95,11 @@ def create_default_state() -> AssistantState:
         "last_specialist": "",
         "correction_directive": "",
         "tool_calls": [],
+        "plan": [],
+        "plan_index": 0,
+        "execution_log": [],
+        "verification_results": [],
+        "step_retry_count": 0,
     }
 
 

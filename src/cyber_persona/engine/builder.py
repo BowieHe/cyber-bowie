@@ -8,7 +8,9 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_openai import ChatOpenAI
 
 from cyber_persona.engine.nodes.chat_agent import create_chat_agent
-from cyber_persona.engine.nodes.supervisor import create_supervisor_agent
+from cyber_persona.engine.nodes.plan_node import plan_node
+from cyber_persona.engine.nodes.router import router_node
+from cyber_persona.engine.nodes.verifier import verifier_node
 from cyber_persona.engine.nodes.harness import fact_check_harness_node
 from cyber_persona.engine.nodes.error_handler import error_handling_node
 from cyber_persona.engine.routers import fact_check_harness_router
@@ -16,7 +18,7 @@ from cyber_persona.engine.nodes.research_supervisor.graph import create_research
 from cyber_persona.engine.nodes.drafter import drafter_node
 from cyber_persona.engine.nodes.debater.graph import create_debater_subgraph
 from cyber_persona.engine.nodes.synthesizer import synthesizer_node
-from cyber_persona.engine.nodes.output_verifier import output_verifier_node, verifier_router
+from cyber_persona.engine.nodes.output_verifier import output_verifier_node
 from cyber_persona.models import AssistantState, create_default_state
 from cyber_persona.tools import SearchTool
 
@@ -88,8 +90,19 @@ class GraphBuilder:
         return compiled
 
 
-def _supervisor_router(state: AssistantState) -> str:
-    return state.get("next_agent", "chat_agent")
+def _router_conditional(state: AssistantState) -> str:
+    """Route from router node to the chosen specialist."""
+    next_agent = state.get("next_agent", "chat_agent")
+    if next_agent == "__end__":
+        return "end"
+    return next_agent
+
+
+def _verifier_conditional(state: AssistantState) -> str:
+    """Route from verifier back to router."""
+    # Verifier always routes back to router.
+    # The verifier node itself handles plan_index advancement on PASSED.
+    return "router"
 
 
 def create_graph(
@@ -101,56 +114,45 @@ def create_graph(
     builder = GraphBuilder(llm=llm, search_tool=search_tool)
     light = llm_light or llm
 
-    # Supervisor and specialists
-    builder.add_node("supervisor", create_supervisor_agent(light))
+    # Plan-driven nodes
+    builder.add_node("plan_node", plan_node(light))
+    builder.add_node("router", router_node(light))
+    builder.add_node("verifier", verifier_node(light))
+
+    # Specialists
     builder.add_node("chat_agent", create_chat_agent(llm))
     builder.add_node("research_orchestrator", create_research_orchestrator_subgraph(light))
     builder.add_node("drafter", drafter_node(llm))
-    builder.add_node("fact_check_harness", fact_check_harness_node(light))
     builder.add_node("debater_agent", create_debater_subgraph(llm))
     builder.add_node("synthesizer", synthesizer_node(llm))
-    builder.add_node("error_handling", error_handling_node)
-    builder.add_node("output_verifier", output_verifier_node(light))
 
-    # Supervisor routing
+    # Legacy harness / verifier nodes
+    builder.add_node("fact_check_harness", fact_check_harness_node(light))
+    builder.add_node("output_verifier", output_verifier_node(light))
+    builder.add_node("error_handling", error_handling_node)
+
+    # Flow: plan -> router -> (specialist) -> verifier -> router
+    builder.add_edge("plan_node", "router")
+
     builder.add_conditional_edges(
-        "supervisor",
-        _supervisor_router,
+        "router",
+        _router_conditional,
         {
             "chat_agent": "chat_agent",
             "research_orchestrator": "research_orchestrator",
             "drafter": "drafter",
             "debater_agent": "debater_agent",
             "synthesizer": "synthesizer",
-            "supervisor": "supervisor",
+            "end": END,
         },
     )
 
-    # Specialists return to supervisor, verifier, or END
-    builder.add_edge("chat_agent", "output_verifier")
-    builder.add_edge("research_orchestrator", "supervisor")
-    builder.add_edge("drafter", "fact_check_harness")
-    builder.add_conditional_edges(
-        "fact_check_harness",
-        fact_check_harness_router,
-        {
-            "continue_to_debate": "debater_agent",
-            "rewrite_draft": "drafter",
-            "force_quit": "error_handling",
-        },
-    )
-    builder.add_edge("debater_agent", "supervisor")
-    builder.add_edge("synthesizer", "output_verifier")
-    builder.add_edge("error_handling", END)
-    builder.add_conditional_edges(
-        "output_verifier",
-        verifier_router,
-        {
-            "pass": END,
-            "retry_chat_agent": "chat_agent",
-            "retry_synthesizer": "synthesizer",
-        },
-    )
+    # All specialists go through verifier before returning to router
+    for specialist in ("chat_agent", "research_orchestrator", "drafter",
+                       "debater_agent", "synthesizer"):
+        builder.add_edge(specialist, "verifier")
 
-    builder.set_entry_point("supervisor")
+    builder.add_edge("verifier", "router")
+
+    builder.set_entry_point("plan_node")
     return builder.build()

@@ -65,6 +65,10 @@ def reflect_node(llm: ChatOpenAI | None = None):
             "missing_information": evaluation.missing_information or "",
             "status_message": f"信息评估: {evaluation.status}",
             "next_agent": "drafter" if evaluation.status in ("PASSED", "PARTIAL_ACCEPT") else None,
+            "execution_log": [
+                f"reflect: 信息评估 {evaluation.status}"
+                f"，{'建议进入撰写阶段' if evaluation.status in ('PASSED', 'PARTIAL_ACCEPT') else '需要补充搜索'}"
+            ],
         }
 
         if evaluation.status == "NEEDS_RETRY" and evaluation.correction_directive:
