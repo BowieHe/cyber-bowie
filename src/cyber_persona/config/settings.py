@@ -101,17 +101,17 @@ class SearchSettings:
     @classmethod
     def from_env(cls) -> "SearchSettings":
         """Create settings from environment variables."""
-        auth_token = os.getenv("SEARCH_AUTH_TOKEN")
+        auth_token = os.getenv("MCP_SEARCH_AUTH_TOKEN")
         # Allow empty string to be treated as None
         if auth_token == "":
             auth_token = None
 
         return cls(
-            server_url=os.getenv("SEARCH_SERVER_URL", "http://localhost:3000"),
-            tool_name=os.getenv("SEARCH_TOOL_NAME", "bailian_web_search"),
+            server_url=os.getenv("MCP_SEARCH_URL", "http://localhost:3000"),
+            tool_name=os.getenv("MCP_SEARCH_TOOL", "bailian_web_search"),
             auth_token=auth_token,
-            auth_header=os.getenv("SEARCH_AUTH_HEADER", "Authorization"),
-            result_count=int(os.getenv("SEARCH_RESULT_COUNT", "10")),
+            auth_header=os.getenv("MCP_SEARCH_AUTH_HEADER", "Authorization"),
+            result_count=int(os.getenv("MCP_SEARCH_RESULT_COUNT", "10")),
         )
 
 
