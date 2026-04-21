@@ -9,7 +9,7 @@ from cyber_persona.models import AssistantState
 
 logger = logging.getLogger(__name__)
 
-MAX_GATHER_ROUNDS = 2
+MAX_GATHER_ROUNDS = 10
 
 
 def research_supervisor_router(state: AssistantState) -> str:
