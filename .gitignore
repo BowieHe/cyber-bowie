@@ -21,3 +21,8 @@ __pycache__/
 .codex
 codex
 codex/
+
+# Zectrix plugin runtime data
+data/zectrix/
+config/tokens/
+config/synced_events/
