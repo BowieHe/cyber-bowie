@@ -36,6 +36,7 @@ export interface NodeInfo {
   startTime: number;
   endTime?: number;
   toolCalls?: ToolCall[];
+  data?: Record<string, unknown>;
 }
 
 export interface Message {

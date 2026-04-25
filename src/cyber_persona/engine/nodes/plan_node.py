@@ -5,6 +5,7 @@ that the Router will follow step by step.
 """
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -15,7 +16,9 @@ from cyber_persona.models import AssistantState
 
 logger = logging.getLogger(__name__)
 
-PLAN_PROMPT = """你是任务规划器。根据用户请求，判断需要哪些步骤来完成任务。
+PLAN_PROMPT = """当前日期：{current_date}
+
+你是任务规划器。根据用户请求，判断需要哪些步骤来完成任务。
 
 可用步骤（严格使用以下名称）：
 - chat_agent: 闲聊、问候、简单问答（不需要深度研究时）
@@ -64,7 +67,8 @@ def plan_node(llm: ChatOpenAI | None = None):
         user_query = state.get("user_query", "")
         logger.info("PlanNode generating plan for query=%r", user_query)
 
-        prompt = PLAN_PROMPT.format(user_query=user_query)
+        current_date = datetime.now().strftime("%Y年%m月%d日")
+        prompt = PLAN_PROMPT.format(current_date=current_date, user_query=user_query)
         messages = [
             SystemMessage(content="你是一个任务规划器，只输出步骤名称列表。"),
             HumanMessage(content=prompt),

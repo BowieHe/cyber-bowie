@@ -148,6 +148,15 @@ export function useSSE() {
               const thinkingText = extractThinking(nodeData);
               const nodeToolCalls = extractToolCalls(nodeData);
 
+              // Only update main message content from terminal output nodes
+              const CONTENT_NODES = new Set([
+                "synthesizer",
+                "chat_agent",
+                "chat_llm",
+                "format_output",
+              ]);
+              const isContentNode = CONTENT_NODES.has(event.node ?? "");
+
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 if (!last || last.role !== "assistant") return prev;
@@ -163,6 +172,7 @@ export function useSSE() {
                     status: "running",
                     output: preview,
                     statusMessage: preview,
+                    data: nodeData,
                     toolCalls: nodeToolCalls.length > 0
                       ? nodeToolCalls
                       : updatedNodes[existingIndex].toolCalls,
@@ -174,6 +184,7 @@ export function useSSE() {
                     output: preview,
                     statusMessage: preview,
                     startTime: Date.now(),
+                    data: nodeData,
                     toolCalls: nodeToolCalls,
                   });
                 }
@@ -182,11 +193,19 @@ export function useSSE() {
                   ? [...last.thinking, thinkingText]
                   : last.thinking;
 
-                const possibleAnswer =
-                  (nodeData.final_answer as string) ||
-                  (nodeData.llm_response as string) ||
-                  (nodeData.output as string) ||
-                  "";
+                // Only overwrite main content from terminal nodes to avoid
+                // intermediate status messages flashing as the answer.
+                let newContent = last.content;
+                if (isContentNode) {
+                  const possibleAnswer =
+                    (nodeData.final_answer as string) ||
+                    (nodeData.llm_response as string) ||
+                    (nodeData.output as string) ||
+                    "";
+                  if (possibleAnswer) {
+                    newContent = possibleAnswer;
+                  }
+                }
 
                 return [
                   ...prev.slice(0, -1),
@@ -194,7 +213,7 @@ export function useSSE() {
                     ...last,
                     nodes: updatedNodes,
                     thinking: updatedThinking,
-                    content: possibleAnswer || last.content,
+                    content: newContent,
                   },
                 ];
               });

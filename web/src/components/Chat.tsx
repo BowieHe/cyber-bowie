@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Message } from "@/types/events";
 import { MessageBubble } from "./MessageBubble";
+import { Timeline } from "./Timeline";
 import { InputBox } from "./InputBox";
 
 interface ChatProps {
@@ -42,7 +43,12 @@ export function Chat({ messages, isLoading, onSend }: ChatProps) {
           </div>
         )}
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <div key={msg.id} className="space-y-2">
+            {msg.role === "assistant" && msg.nodes.length > 0 && (
+              <Timeline nodes={msg.nodes} isLoading={msg.isLoading} />
+            )}
+            <MessageBubble message={msg} />
+          </div>
         ))}
         <div ref={bottomRef} />
       </div>

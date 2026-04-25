@@ -1,7 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import type { Message } from "@/types/events";
 import { MarkdownRender } from "./MarkdownRender";
-import { ExecutionFlow } from "./ExecutionFlow";
 import { ThinkingBlock } from "./ThinkingBlock";
 
 interface MessageBubbleProps {
@@ -20,10 +19,6 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-ai-bg border border-border rounded-bl-sm"
         }`}
       >
-        {!isUser && message.nodes.length > 0 && (
-          <ExecutionFlow nodes={message.nodes} isLoading={message.isLoading} />
-        )}
-
         {!isUser && message.thinking.length > 0 && (
           <ThinkingBlock thinking={message.thinking} isLoading={message.isLoading} />
         )}
