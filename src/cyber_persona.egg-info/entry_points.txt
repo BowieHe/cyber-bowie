@@ -1,2 +1,0 @@
-[console_scripts]
-cp = cyber_persona.__main__:main

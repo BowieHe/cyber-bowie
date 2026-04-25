@@ -26,3 +26,4 @@ codex/
 data/zectrix/
 config/tokens/
 config/synced_events/
+.claude/
