@@ -10,6 +10,28 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 
+# Model-specific default parameters. Add new models here.
+MODEL_PRESETS: dict[str, dict] = {
+    "kimi-k2.5": {
+        "base_url": "https://api.moonshot.cn/v1",
+        "temperature": 0.6,
+        "model_kwargs": {},
+        "extra_body": {"thinking": {"type": "disabled"}},
+    },
+    "deepseek-v4-flash": {
+        "base_url": "https://api.deepseek.com/v1",
+        "temperature": 0.7,
+        "model_kwargs": {},
+        "extra_body": {},
+    },
+}
+
+
+def _get_preset(model_name: str) -> dict:
+    """Get preset for a model, falling back to kimi-k2.5 if unknown."""
+    return MODEL_PRESETS.get(model_name, MODEL_PRESETS["kimi-k2.5"])
+
+
 @dataclass(frozen=True)
 class LLMSettings:
     """LLM provider configuration."""
@@ -18,17 +40,21 @@ class LLMSettings:
     base_url: str
     model: str
     temperature: float
+    model_kwargs: dict
     extra_body: dict
 
     @classmethod
     def from_env(cls) -> "LLMSettings":
         """Create settings from environment variables."""
+        model = os.getenv("OPENAI_MODEL", "kimi-k2.5")
+        preset = _get_preset(model)
         return cls(
             api_key=os.getenv("OPENAI_API_KEY", ""),
-            base_url=os.getenv("OPENAI_BASE_URL", "https://api.moonshot.cn/v1"),
-            model=os.getenv("OPENAI_MODEL", "kimi-k2.5"),
-            temperature=float(os.getenv("OPENAI_TEMPERATURE", "1")),
-            extra_body={"thinking": {"type": "disabled"}},
+            base_url=preset["base_url"],
+            model=model,
+            temperature=preset["temperature"],
+            model_kwargs=preset["model_kwargs"],
+            extra_body=preset["extra_body"],
         )
 
     def validate(self) -> None:
@@ -45,23 +71,21 @@ class LightLLMSettings:
     base_url: str
     model: str
     temperature: float
+    model_kwargs: dict
     extra_body: dict
 
     @classmethod
     def from_env(cls) -> "LightLLMSettings":
-        """Create settings from environment variables.
-
-        Falls back to the main LLM env vars when light-specific vars are unset,
-        so existing deployments continue to work without extra configuration.
-        """
+        """Create settings from environment variables."""
+        model = os.getenv("OPENAI_LIGHT_MODEL", "kimi-k2.5")
+        preset = _get_preset(model)
         return cls(
             api_key=os.getenv("OPENAI_LIGHT_API_KEY") or os.getenv("OPENAI_API_KEY", ""),
-            base_url=os.getenv("OPENAI_LIGHT_BASE_URL") or os.getenv("OPENAI_BASE_URL", "https://api.moonshot.cn/v1"),
-            model=os.getenv("OPENAI_LIGHT_MODEL") or os.getenv("OPENAI_MODEL", "kimi-k2.5"),
-            temperature=float(
-                os.getenv("OPENAI_LIGHT_TEMPERATURE") or os.getenv("OPENAI_TEMPERATURE", "1")
-            ),
-            extra_body={"thinking": {"type": "disabled"}},
+            base_url=preset["base_url"],
+            model=model,
+            temperature=preset["temperature"],
+            model_kwargs=preset["model_kwargs"],
+            extra_body=preset["extra_body"],
         )
 
     def validate(self) -> None:

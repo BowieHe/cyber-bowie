@@ -61,7 +61,7 @@ def _parse_plan(text: str) -> list[str]:
 
 def plan_node(llm: ChatOpenAI | None = None):
     """Factory for the plan node."""
-    llm_instance = get_llm(llm)
+    llm_instance = get_llm(llm, model_kwargs={})
 
     async def _node(state: AssistantState) -> dict[str, Any]:
         user_query = state.get("user_query", "")
