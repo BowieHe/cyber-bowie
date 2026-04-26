@@ -4,9 +4,7 @@ Usage (one-time):
     python -m cyber_persona.plugins.zectrix.calendar_sync.auth
 """
 
-import json
 import logging
-from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -84,9 +82,9 @@ def run_auth_flow() -> None:
 
     save_credentials(creds)
     logger.info("Authorization successful. Token saved to %s", TOKEN_PATH)
-    print(f"\n✅ Authorization successful!")
+    print("\n✅ Authorization successful!")
     print(f"   Token saved to: {TOKEN_PATH}")
-    print(f"   You can now run the sync scheduler.")
+    print("   You can now run the sync scheduler.")
 
 
 if __name__ == "__main__":

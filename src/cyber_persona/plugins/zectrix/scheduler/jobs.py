@@ -1,10 +1,11 @@
 """APScheduler jobs for the Zectrix plugin.
 
-- Periodic sync: every 12 hours, pull Google Calendar events and push to Zectrix.
+Periodic sync: every 12 hours by default, pull Google Calendar events and
+push diffs (create / update / delete) to the Zectrix device.
 """
 
-import asyncio
 import logging
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -22,8 +23,13 @@ async def _sync_job() -> None:
     logger.info("[Zectrix] Starting scheduled calendar sync...")
     try:
         sync = CalendarSync()
-        count = await sync.run()
-        logger.info("[Zectrix] Scheduled sync finished. Created %d todos.", count)
+        counts = await sync.run()
+        logger.info(
+            "[Zectrix] Scheduled sync done: +%d ~%d -%d",
+            counts["created"],
+            counts["updated"],
+            counts["deleted"],
+        )
     except Exception:
         logger.exception("[Zectrix] Scheduled sync failed")
 
@@ -39,7 +45,9 @@ def start_scheduler(
     Args:
         hours: Interval between syncs.
         minutes: Additional minutes between syncs.
-        run_immediately: Whether to run a sync immediately on start.
+        run_immediately: Whether to fire a sync as soon as the loop runs.
+            Implemented via APScheduler's ``next_run_time`` to avoid the
+            ``asyncio.create_task`` race against ``loop.run_forever()``.
     """
     global _scheduler
 
@@ -55,18 +63,16 @@ def start_scheduler(
         trigger=IntervalTrigger(hours=hours, minutes=minutes),
         id="zectrix_calendar_sync",
         name="Zectrix Calendar Sync",
+        next_run_time=datetime.now() if run_immediately else None,
         replace_existing=True,
     )
     _scheduler.start()
     logger.info(
-        "[Zectrix] Scheduler started. Sync interval: %dh %dm",
+        "[Zectrix] Scheduler started. Sync interval: %dh %dm (run_immediately=%s)",
         hours,
         minutes,
+        run_immediately,
     )
-
-    if run_immediately:
-        # Schedule an immediate run
-        asyncio.create_task(_sync_job())
 
     return _scheduler
 

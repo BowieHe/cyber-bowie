@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Device(BaseModel):
@@ -46,25 +46,49 @@ class DisplayPushResult(BaseModel):
 
 
 class SyncedEventRecord(BaseModel):
-    """Record of a calendar event that has been synced to Zectrix."""
+    """Snapshot of a calendar event already synced to a Zectrix todo.
+
+    Stored in SyncState so the next sync can diff against it and decide
+    whether to issue create / update / delete API calls.
+    """
 
     event_id: str
+    todo_id: int
     synced_at: datetime
-    todo_id: int | None = None
+    title: str
+    dueDate: str = ""
+    dueTime: str = ""
+    description: str = ""
 
 
 class SyncState(BaseModel):
-    """Persistent sync state."""
+    """Persistent sync state.
 
-    synced_event_ids: list[str] = Field(default_factory=list)
+    Maps Google Calendar event_id -> the Zectrix todo we created for it.
+    """
+
+    synced_events: dict[str, SyncedEventRecord] = Field(default_factory=dict)
     last_sync_at: datetime | None = None
+    legacy_format_detected: bool = Field(default=False, exclude=True)
 
-    def add_event(self, event_id: str) -> None:
-        if event_id not in self.synced_event_ids:
-            self.synced_event_ids.append(event_id)
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy(cls, data: Any) -> Any:
+        """Migrate the v1 format `{synced_event_ids: [...]}` to v2 empty dict.
 
-    def is_synced(self, event_id: str) -> bool:
-        return event_id in self.synced_event_ids
+        v1 only stored event IDs, with no todo_id mapping, so we cannot
+        reconstruct a useful state. We start fresh and flag the migration so
+        the CLI can warn the user that duplicates may appear on the device.
+        """
+        if not isinstance(data, dict):
+            return data
+        if "synced_event_ids" in data and "synced_events" not in data:
+            return {
+                "synced_events": {},
+                "last_sync_at": data.get("last_sync_at"),
+                "legacy_format_detected": True,
+            }
+        return data
 
 
 class CalendarEvent(BaseModel):
@@ -73,6 +97,7 @@ class CalendarEvent(BaseModel):
     event_id: str
     title: str
     description: str = ""
-    start_time: datetime | None = None
+    start_time: datetime | None = None  # for timed events
+    start_date: date | None = None  # for all-day events
     is_all_day: bool = False
     status: str = "confirmed"  # confirmed, tentative, cancelled

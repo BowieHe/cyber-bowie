@@ -58,11 +58,14 @@ def run_dev():
 
 def print_usage():
     """Print usage information."""
-    print("Usage: cp [server|dev]")
+    print("Usage: cp <command> [args...]")
     print("")
     print("Commands:")
-    print("  server  - Start HTTP server (serves API + built frontend)")
-    print("  dev     - Start server and open browser")
+    print("  server                        - Start HTTP server (API + built frontend)")
+    print("  dev                           - Start server and open browser")
+    print("  zectrix auth                  - Run Google OAuth (one-time)")
+    print("  zectrix sync                  - Run a one-time calendar sync")
+    print("  zectrix scheduler [--hours N] - Start the recurring sync (foreground)")
 
 
 def main():
@@ -77,6 +80,11 @@ def main():
         run_server()
     elif cmd == "dev":
         run_dev()
+    elif cmd == "zectrix":
+        from cyber_persona.plugins.zectrix.cli import main as zectrix_main
+
+        sys.argv = [sys.argv[0]] + sys.argv[2:]
+        zectrix_main()
     else:
         print(f"Unknown command: {cmd}")
         print_usage()

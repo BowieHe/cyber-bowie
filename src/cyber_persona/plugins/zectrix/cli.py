@@ -28,13 +28,28 @@ def setup_logging() -> None:
     )
 
 
+def _warn_if_legacy(sync: CalendarSync) -> None:
+    if sync.state.legacy_format_detected:
+        print(
+            "\n⚠️  检测到旧版同步状态(synced_event_ids 列表),无法迁移 todo_id 映射。"
+            "\n   本次同步会重新创建所有 todos。"
+            "\n   建议先在 Zectrix App 手动清空旧的同步条目,避免重复。\n"
+        )
+
+
 async def cmd_sync() -> None:
     sync = CalendarSync()
-    count = await sync.run()
-    print(f"\n✅ Sync complete. Created {count} new todos.")
+    _warn_if_legacy(sync)
+    counts = await sync.run()
+    print(
+        f"\n✅ Sync complete. +{counts['created']} ~{counts['updated']} -{counts['deleted']}"
+    )
 
 
 def cmd_scheduler(args: argparse.Namespace) -> None:
+    # Warn about legacy state format before starting the loop.
+    _warn_if_legacy(CalendarSync())
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -65,13 +80,9 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # auth
     sub.add_parser("auth", help="Run Google OAuth authorization (one-time)")
-
-    # sync
     sub.add_parser("sync", help="Run a one-time manual sync")
 
-    # scheduler
     sched_parser = sub.add_parser("scheduler", help="Start background scheduler")
     sched_parser.add_argument(
         "--hours",
@@ -87,9 +98,9 @@ def main() -> None:
     )
     sched_parser.add_argument(
         "--now",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Run sync immediately on start (default: True)",
+        help="Run sync immediately on start (default: True). Use --no-now to disable.",
     )
 
     args = parser.parse_args()
